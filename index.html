@@ -8,6 +8,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d8b753994f6239ff841c0bb7015d7e9c&autoload=false"></script>
 <style>
   html, body, #root { height: 100%; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
@@ -585,74 +586,43 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
 }
 
 /* ============================================================
- * KakaoMap (요구사항 5, 6, 7)
- * - 실제 카카오맵 SDK 사용
- * - mapRef: 지도 객체
- * - overlaysRef: 마커 데이터
- * - 추후 DB 연동 시 BUILDINGS 배열만 fetch 결과로 교체
+ * KakaoMap (요구사항 5, 6, 7) - 단순화된 초기화
  * ============================================================ */
 function KakaoMap({ buildings, selectedId, onMarkerClick }) {
   const mapRef = useRef(null);
   const overlaysRef = useRef({});
-  const [mapStatus, setMapStatus] = useState('loading'); // 'loading' | 'ready' | 'no-key' | 'failed'
+  const [mapReady, setMapReady] = useState(false);
 
   // 지도 초기화 (1회)
   useEffect(() => {
-    if (KAKAO_API_KEY === 'YOUR_KAKAO_MAP_API_KEY') {
-      setMapStatus('no-key');
-      return;
-    }
+    if (!window.kakao || !window.kakao.maps) return;
 
-    let cancelled = false;
-    let timeoutId;
+    window.kakao.maps.load(() => {
+      const container = document.getElementById('kakao-map');
+      if (!container) return;
 
-    const initMap = () => {
-      if (cancelled) return;
-      window.kakao.maps.load(() => {
-        if (cancelled) return;
-        const container = document.getElementById('kakao-map-container');
-        if (!container) return;
-        const map = new window.kakao.maps.Map(container, {
-          center: new window.kakao.maps.LatLng(37.52, 127.0),
-          level: 9,
-        });
-        mapRef.current = map;
+      const options = {
+        center: new window.kakao.maps.LatLng(37.5665, 126.9780),
+        level: 5,
+      };
+      const map = new window.kakao.maps.Map(container, options);
+      mapRef.current = map;
 
-        // 모든 빌딩이 보이도록 범위 조정
-        if (buildings.length > 0) {
-          const bounds = new window.kakao.maps.LatLngBounds();
-          buildings.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
-          map.setBounds(bounds);
-        }
-        setMapStatus('ready');
-      });
-    };
+      // 모든 빌딩이 보이도록 범위 조정
+      if (buildings.length > 0) {
+        const bounds = new window.kakao.maps.LatLngBounds();
+        buildings.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
+        map.setBounds(bounds);
+      }
 
-    if (window.kakao && window.kakao.maps) {
-      initMap();
-    } else {
-      const script = document.createElement('script');
-      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=false`;
-      script.async = true;
-      script.onload = initMap;
-      script.onerror = () => { if (!cancelled) setMapStatus('failed'); };
-      document.head.appendChild(script);
-      // 안전장치: 5초 후에도 안 뜨면 실패
-      timeoutId = setTimeout(() => {
-        if (!cancelled && mapStatus === 'loading') setMapStatus('failed');
-      }, 5000);
-    }
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
+      setMapReady(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 마커 업데이트 (buildings/selectedId 변경 시)
   useEffect(() => {
-    if (mapStatus !== 'ready' || !mapRef.current) return;
+    if (!mapReady || !mapRef.current) return;
 
     // 기존 오버레이 모두 제거
     Object.values(overlaysRef.current).forEach(o => o.setMap(null));
@@ -689,57 +659,17 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       overlay.setMap(mapRef.current);
       overlaysRef.current[b.id] = overlay;
     });
-  }, [buildings, selectedId, mapStatus, onMarkerClick]);
+  }, [buildings, selectedId, mapReady, onMarkerClick]);
 
   // 선택된 빌딩으로 지도 이동
   useEffect(() => {
-    if (mapStatus !== 'ready' || !mapRef.current || !selectedId) return;
+    if (!mapReady || !mapRef.current || !selectedId) return;
     const building = buildings.find(b => b.id === selectedId);
     if (!building) return;
     mapRef.current.panTo(new window.kakao.maps.LatLng(building.lat, building.lng));
-  }, [selectedId, buildings, mapStatus]);
+  }, [selectedId, buildings, mapReady]);
 
-  if (mapStatus === 'no-key' || mapStatus === 'failed') {
-    return <MapFallback status={mapStatus} buildings={buildings} />;
-  }
-
-  return (
-    <>
-      <div id="kakao-map-container" className="absolute inset-0" />
-      {mapStatus === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 backdrop-blur-sm pointer-events-none">
-          <div className="text-[11px] text-slate-500">카카오맵 로딩 중...</div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function MapFallback({ status, buildings }) {
-  return (
-    <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
-        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-amber-100 flex items-center justify-center">
-          <AlertCircle size={28} className="text-amber-600" />
-        </div>
-        <h3 className="text-[15px] font-bold text-slate-800 mb-2">
-          {status === 'no-key' ? '카카오맵 API 키를 입력해주세요' : '카카오맵 로딩 실패'}
-        </h3>
-        <p className="text-[11px] text-slate-600 mb-4 leading-relaxed">
-          {status === 'no-key' ? (
-            <>HTML 파일 상단의 <code className="px-1.5 py-0.5 bg-slate-100 rounded font-mono text-[10px]">KAKAO_API_KEY</code> 상수의 값을 본인의 카카오 개발자 키로 변경하세요.<br/>
-            <a href="https://developers.kakao.com" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-semibold">developers.kakao.com</a>에서 무료 발급 가능</>
-          ) : (
-            <>네트워크 연결 또는 API 키를 확인해주세요. 도메인 등록도 필요할 수 있습니다.</>
-          )}
-        </p>
-        <div className="text-[11px] text-slate-500 bg-slate-50 rounded-lg p-3 border border-slate-100">
-          <div className="font-bold text-slate-700 mb-1">현재 {buildings.length}개 빌딩 로드됨</div>
-          <div>우측 리스트 / 상세 패널은 정상 작동 중</div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div id="kakao-map" className="absolute inset-0" />;
 }
 
 function MapLegend() {
