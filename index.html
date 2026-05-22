@@ -6,7 +6,1050 @@
 <title>GenstarMate · 빌딩 지도 기반</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="htt<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenstarMate · 빌딩 지도 기반</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  /* 카카오맵 마커 호버 효과 */
+  .gm-marker:hover { transform: scale(1.08); transition: transform 0.15s; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useEffect, useRef, useCallback } = React;
+
+/* ============================================================
+ * 카카오맵 API 키 - 본인의 키로 교체하세요
+ * https://developers.kakao.com 에서 발급
+ * ============================================================ */
+const KAKAO_API_KEY = 'd8b753994f6239ff841c0bb7015d7e9c';
+
+/* ===== Icon components ===== */
+const Svg = ({ size = 16, className = '', strokeWidth = 2, children, style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+    className={className} style={style}>{children}</svg>
+);
+const MapPin        = (p) => <Svg {...p}><path d="M20 10c0 7-8 13-8 13s-8-6-8-13a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></Svg>;
+const Plus          = (p) => <Svg {...p}><path d="M5 12h14"/><path d="M12 5v14"/></Svg>;
+const ChevronLeft   = (p) => <Svg {...p}><path d="m15 18-6-6 6-6"/></Svg>;
+const ChevronRight  = (p) => <Svg {...p}><path d="m9 18 6-6-6-6"/></Svg>;
+const ChevronDown   = (p) => <Svg {...p}><path d="m6 9 6 6 6-6"/></Svg>;
+const Home          = (p) => <Svg {...p}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></Svg>;
+const Building2     = (p) => <Svg {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></Svg>;
+const Users         = (p) => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Svg>;
+const UserCheck     = (p) => <Svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></Svg>;
+const Briefcase     = (p) => <Svg {...p}><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></Svg>;
+const FileText      = (p) => <Svg {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></Svg>;
+const ImageIcon     = (p) => <Svg {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></Svg>;
+const RotateCcw     = (p) => <Svg {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></Svg>;
+const Sparkles      = (p) => <Svg {...p}><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></Svg>;
+const PanelLeftClose= (p) => <Svg {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></Svg>;
+const PanelLeftOpen = (p) => <Svg {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></Svg>;
+const ShoppingBag   = (p) => <Svg {...p}><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></Svg>;
+const X             = (p) => <Svg {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Svg>;
+const Trash2        = (p) => <Svg {...p}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Svg>;
+const AlertCircle   = (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></Svg>;
+
+/* ===== 권역별 색상 (요구사항 6) ===== */
+const REGION_COLORS = {
+  CBD:    { bg: '#DC2626', light: '#FEE2E2', text: '#991B1B', name: 'CBD',    label: '도심권'   },
+  GBD:    { bg: '#2563EB', light: '#DBEAFE', text: '#1E40AF', name: 'GBD',    label: '강남권'   },
+  YBD:    { bg: '#059669', light: '#D1FAE5', text: '#065F46', name: 'YBD',    label: '여의도권' },
+  BBD:    { bg: '#7C3AED', light: '#EDE9FE', text: '#5B21B6', name: 'BBD',    label: '분당권'   },
+  OTHERS: { bg: '#F59E0B', light: '#FEF3C7', text: '#92400E', name: 'OTHERS', label: '기타'     },
+  OUT:    { bg: '#64748B', light: '#E2E8F0', text: '#334155', name: '권역외', label: '권역 외'  },
+};
+
+/* ============================================================
+ * 빌딩 데이터 - 10개 샘플 (요구사항 4)
+ * 추후 API/DB로 교체 시 이 배열만 fetch 결과로 대체하면 됨
+ * ============================================================ */
+const BUILDINGS = [
+  {
+    id: 1, name: '성지빌딩', region: 'CBD',
+    address: '서울특별시 종로구 종로 398',
+    lat: 37.5712, lng: 127.0033,
+    built: 2026, renovated: null,
+    aboveFloors: 13, belowFloors: 2,
+    area: 2398.05, occupancy: 77.95,
+    baseLease: 156.78, baseNet: 122.21, noc: 150205,
+    exclusive: false, parking: '자주식',
+    vacancies: [
+      { floor: '13층', area: 171.96, net: 137.38, noc: 150205, when: '협의' },
+      { floor: '12층', area: 171.96, net: 137.38, noc: 150205, when: '협의' },
+    ]
+  },
+  {
+    id: 2, name: '아우디타워', region: 'GBD',
+    address: '서울특별시 강남구 도산대로 306',
+    lat: 37.5236, lng: 127.0376,
+    built: 1989, renovated: 2018,
+    aboveFloors: 9, belowFloors: 1,
+    area: 1875.81, occupancy: 80.56,
+    baseLease: 210.20, baseNet: 169.33, noc: 218086,
+    exclusive: true, parking: '자주식',
+    vacancies: [
+      { floor: '6층', area: 210.20, net: 169.33, noc: 218086, when: '2026-07' },
+      { floor: '5층', area: 200.59, net: 160.30, noc: 218086, when: '2026-07' },
+    ]
+  },
+  {
+    id: 3, name: '유화증권빌딩', region: 'YBD',
+    address: '서울특별시 영등포구 국제금융로2길 36',
+    lat: 37.5260, lng: 126.9272,
+    built: 1994, renovated: null,
+    aboveFloors: 20, belowFloors: 6,
+    area: 11843, occupancy: 44.94,
+    baseLease: 561.03, baseNet: 252.13, noc: 240856,
+    exclusive: false, parking: '기계식',
+    vacancies: [
+      { floor: '15층', area: 561.03, net: 252.13, noc: 240856, when: '2026-09' },
+      { floor: '14층', area: 561.03, net: 252.13, noc: 240856, when: '2026-09' },
+    ]
+  },
+  {
+    id: 4, name: '과천스마트케이 A동', region: 'BBD',
+    address: '경기 과천시 과천대로7길 20',
+    lat: 37.4308, lng: 127.0027,
+    built: 2022, renovated: null,
+    aboveFloors: 15, belowFloors: 4,
+    area: 40655, occupancy: 52.92,
+    baseLease: 1493, baseNet: 790.27, noc: 111985,
+    exclusive: false, parking: '자주식',
+    vacancies: [
+      { floor: '13층', area: 1493, net: 790, noc: 111985, when: '즉시' },
+      { floor: '11층', area: 964, net: 510, noc: 111985, when: '즉시' },
+    ]
+  },
+  {
+    id: 5, name: '세미콜론 문래 N-Tower', region: 'YBD',
+    address: '서울특별시 영등포구 문래로28길 25',
+    lat: 37.5176, lng: 126.9050,
+    built: 2017, renovated: null,
+    aboveFloors: 13, belowFloors: 5,
+    area: 29980, occupancy: 51.27,
+    baseLease: 1164.42, baseNet: 597.46, noc: 251142,
+    exclusive: true, parking: '자주식',
+    vacancies: [
+      { floor: '11층', area: 1165.23, net: 597.46, noc: 251142, when: '협의' },
+      { floor: '10층', area: 746.21, net: 382.61, noc: 251142, when: '협의' },
+    ]
+  },
+  {
+    id: 6, name: '을지로3가 제9지구 업무시설', region: 'CBD',
+    address: '서울특별시 중구 을지로 일원',
+    lat: 37.5658, lng: 126.9920,
+    built: 2028, renovated: null,
+    aboveFloors: 19, belowFloors: 8,
+    area: 8371.97, occupancy: 52.49,
+    baseLease: 454.71, baseNet: 238.70, noc: 0,
+    exclusive: true, parking: '자주식',
+    vacancies: [
+      { floor: '19층', area: 454.71, net: 238.70, noc: 0, when: 'TBA' },
+      { floor: '18층', area: 454.71, net: 238.70, noc: 0, when: 'TBA' },
+    ]
+  },
+  {
+    id: 7, name: '분당M타워', region: 'BBD',
+    address: '경기 성남시 분당구 구미로 8',
+    lat: 37.3470, lng: 127.1080,
+    built: 2009, renovated: 2024,
+    aboveFloors: 8, belowFloors: 4,
+    area: 13952.9, occupancy: 56.91,
+    baseLease: 1732.52, baseNet: 986.02, noc: 190389,
+    exclusive: true, parking: '자주식',
+    vacancies: [
+      { floor: '3층 A', area: 299.95, net: 170.36, noc: 190389, when: '즉시' },
+      { floor: '3층 B', area: 181.40, net: 103.03, noc: 190389, when: '즉시' },
+    ]
+  },
+  {
+    id: 8, name: '잠원동 PFV', region: 'GBD',
+    address: '서울특별시 서초구 강남대로 573',
+    lat: 37.5146, lng: 127.0246,
+    built: 2026, renovated: null,
+    aboveFloors: 12, belowFloors: 8,
+    area: 8016, occupancy: 46.01,
+    baseLease: 600.27, baseNet: 276.21, noc: 396927,
+    exclusive: false, parking: '자주식',
+    vacancies: [
+      { floor: '12층', area: 463.90, net: 213.46, noc: 396927, when: '즉시' },
+      { floor: '11층', area: 524.17, net: 213.46, noc: 396927, when: '즉시' },
+    ]
+  },
+  {
+    id: 9, name: '케이스퀘어 마곡 T1', region: 'OTHERS',
+    address: '서울특별시 강서구 마곡중앙로 161',
+    lat: 37.5604, lng: 126.8260,
+    built: 2017, renovated: null,
+    aboveFloors: 19, belowFloors: 4,
+    area: 14500, occupancy: 55.0,
+    baseLease: 165, baseNet: 110, noc: 180000,
+    exclusive: false, parking: '자주식',
+    vacancies: [
+      { floor: '6층', area: 180, net: 130, noc: 180000, when: '즉시' },
+    ]
+  },
+  {
+    id: 10, name: '씨드큐브 창동', region: 'OUT',
+    address: '서울특별시 도봉구 마들로11길 64',
+    lat: 37.6538, lng: 127.0469,
+    built: 2019, renovated: null,
+    aboveFloors: 18, belowFloors: 3,
+    area: 12100, occupancy: 49.0,
+    baseLease: 145, baseNet: 95, noc: 160000,
+    exclusive: false, parking: '혼용',
+    vacancies: [
+      { floor: '10층', area: 200, net: 140, noc: 160000, when: '2026-05' },
+    ]
+  },
+];
+
+/* ===== 사이드바 메뉴 (요구사항 2 - 단순화) ===== */
+const NAV_SECTIONS = [
+  { group: '메인', items: [
+    { icon: Home, label: '홈 대시보드' }
+  ]},
+  { group: '빌딩', items: [
+    { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'], active: true, activeChild: '지도' }
+  ]},
+  { group: '거래처 (관리 기업)', items: [
+    { icon: Briefcase, label: '거래처', children: ['전체 거래처'] }
+  ]},
+  { group: '고객 (담당자)', items: [
+    { icon: Users, label: '고객', children: ['전체 고객'] }
+  ]},
+  { group: '리드', items: [
+    { icon: UserCheck, label: '리드', children: ['전체 리드'] }
+  ]},
+  { group: '계약 관리', items: [
+    { icon: FileText, label: '계약', children: ['전체 계약'] }
+  ]},
+];
+
+/* ===== 필터 (요구사항 8 - 그대로 유지) ===== */
+const FILTER_DEFS = [
+  { key: 'totalArea',     label: '총 임차 가능면적',          unit: '평',    type: 'range' },
+  { key: 'baseFloorArea', label: '건축물대장 기준층 면적',   unit: '평',    type: 'range' },
+  { key: 'netArea',       label: '전용 면적',                  unit: '평',    type: 'range' },
+  { key: 'monthlyFee',    label: '월 고정비',                  unit: '원/평', type: 'range' },
+  { key: 'deposit',       label: '보증금',                     unit: '원/평', type: 'range' },
+  { key: 'noc',           label: 'NOC',                        unit: '',      type: 'range' },
+  { key: 'exclusive',     label: '전속',                       type: 'yn' },
+  { key: 'floors',        label: '층수',                       type: 'multi', options: ['1층', '지하층', '지상층(1층 제외)'] },
+  { key: 'vacancy',       label: '공실',                       type: 'yn' },
+  { key: 'parking',       label: '주차',                       type: 'multi', options: ['자주식', '기계식', '혼용'] },
+];
+
+const INITIAL_FILTERS = FILTER_DEFS.reduce((acc, def) => {
+  acc[def.key] = def.type === 'range' ? { min: '', max: '' } : (def.type === 'multi' ? [] : null);
+  return acc;
+}, {});
+
+/* ============================================================
+ * 카트(담긴 매물) 헬퍼 - 추후 엑셀/콤프 출력에 사용 가능 (요구사항 1)
+ * ============================================================ */
+const cartHelpers = {
+  buildCartItem: (building, vacancy) => ({
+    id: `${building.id}-${vacancy.floor}`,
+    buildingId: building.id,
+    buildingName: building.name,
+    address: building.address,
+    region: building.region,
+    floor: vacancy.floor,
+    area: vacancy.area,
+    net: vacancy.net,
+    noc: vacancy.noc,
+    when: vacancy.when,
+    addedAt: Date.now(),
+  }),
+  // 추후 엑셀 비교표용
+  toCSV: (cart) => {
+    const headers = ['빌딩명', '주소', '권역', '층', '임대면적(평)', '전용면적(평)', 'NOC', '입주시기'];
+    const rows = cart.map(i => [i.buildingName, i.address, i.region, i.floor, i.area, i.net, i.noc, i.when]);
+    return [headers, ...rows].map(r => r.join(',')).join('\n');
+  },
+};
+
+/* ===== 빌딩 표시 헬퍼 ===== */
+const formatFloors = (b) => `B${b.belowFloors}/${b.aboveFloors}F`;
+const formatBuilt  = (b) => b.renovated ? `${b.built} / ${b.renovated}` : `${b.built}`;
+const sumVacancyArea = (b) => b.vacancies.reduce((s, v) => s + v.area, 0);
+const sumVacancyNet  = (b) => b.vacancies.reduce((s, v) => s + v.net, 0);
+const avgVacancyNoc  = (b) => b.vacancies.length > 0
+  ? Math.round(b.vacancies.reduce((s, v) => s + v.noc, 0) / b.vacancies.length) : 0;
+
+/* ============================================================
+ * Main
+ * ============================================================ */
+function GenstarMate() {
+  const [selectedId, setSelectedId]       = useState(1);
+  const [sidebarOpen, setSidebarOpen]     = useState(true);
+  const [filters, setFilters]             = useState(INITIAL_FILTERS);
+  const [openFilterKey, setOpenFilterKey] = useState(null);
+  const [activeRegions, setActiveRegions] = useState(['CBD', 'GBD', 'YBD', 'BBD', 'OTHERS', 'OUT']);
+  const [photoIdx, setPhotoIdx]           = useState(0);
+  const [cart, setCart]                   = useState([]);
+  const [cartOpen, setCartOpen]           = useState(false);
+
+  const resetFilters = () => {
+    setFilters(INITIAL_FILTERS);
+    setActiveRegions(['CBD', 'GBD', 'YBD', 'BBD', 'OTHERS', 'OUT']);
+    setOpenFilterKey(null);
+  };
+
+  const visibleBuildings = useMemo(
+    () => BUILDINGS.filter(b => activeRegions.includes(b.region)),
+    [activeRegions]
+  );
+
+  const selected = BUILDINGS.find(b => b.id === selectedId) || BUILDINGS[0];
+
+  const hasFilterValue = (key) => {
+    const v = filters[key];
+    if (!v) return false;
+    if (Array.isArray(v)) return v.length > 0;
+    if (typeof v === 'object') return v.min || v.max;
+    return true;
+  };
+
+  // 카트 핸들러
+  const addToCart = useCallback((building, vacancy) => {
+    setCart(prev => {
+      const item = cartHelpers.buildCartItem(building, vacancy);
+      return prev.find(i => i.id === item.id) ? prev : [...prev, item];
+    });
+  }, []);
+
+  const addAllVacancies = useCallback((building) => {
+    setCart(prev => {
+      const newItems = building.vacancies
+        .map(v => cartHelpers.buildCartItem(building, v))
+        .filter(item => !prev.find(e => e.id === item.id));
+      return [...prev, ...newItems];
+    });
+  }, []);
+
+  const removeFromCart = useCallback((id) => setCart(prev => prev.filter(i => i.id !== id)), []);
+  const clearCart      = useCallback(() => setCart([]), []);
+
+  const handleSelectBuilding = useCallback((id) => {
+    setSelectedId(id);
+    setPhotoIdx(0);
+  }, []);
+
+  return (
+    <div className="h-screen flex bg-slate-50 text-slate-800 overflow-hidden text-[13px]">
+      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <FilterBar filters={filters} setFilters={setFilters}
+          openFilterKey={openFilterKey} setOpenFilterKey={setOpenFilterKey}
+          hasFilterValue={hasFilterValue}
+          activeRegions={activeRegions} setActiveRegions={setActiveRegions}
+          resetFilters={resetFilters}
+          cartCount={cart.length} onCartClick={() => setCartOpen(true)} />
+        <main className="flex-1 flex overflow-hidden min-h-0">
+          <div className="flex-1 relative bg-slate-100 min-w-0">
+            <KakaoMap
+              buildings={visibleBuildings}
+              selectedId={selectedId}
+              onMarkerClick={handleSelectBuilding} />
+            <MapLegend />
+            <MapStats count={visibleBuildings.length} regionCount={activeRegions.length} />
+          </div>
+          <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
+            onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart} />
+          <CompactList buildings={visibleBuildings} selectedId={selectedId}
+            onSelect={handleSelectBuilding} />
+        </main>
+      </div>
+
+      {cartOpen && (
+        <CartDrawer cart={cart} onClose={() => setCartOpen(false)}
+          onRemove={removeFromCart} onClear={clearCart} />
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+ * Sidebar (요구사항 2)
+ * ============================================================ */
+function Sidebar({ open, onToggle }) {
+  const initialExpanded = useMemo(() => {
+    const exp = {};
+    NAV_SECTIONS.forEach(section => {
+      section.items.forEach(item => {
+        if (item.children) exp[item.label] = !!item.active;
+      });
+    });
+    return exp;
+  }, []);
+  const [expanded, setExpanded] = useState(initialExpanded);
+  const toggle = (label) => setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
+
+  return (
+    <aside className={`bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100 flex flex-col flex-shrink-0 transition-all duration-200 ${open ? 'w-48' : 'w-12'}`}>
+      <div className="px-3 py-3 border-b border-slate-700/40 flex items-center justify-between flex-shrink-0">
+        {open && (
+          <div>
+            <div className="text-[14px] font-bold tracking-tight">Genstar<span className="font-light text-indigo-300">Mate</span></div>
+            <div className="text-[9px] text-slate-400 mt-0.5">CRM v1.0 · 오피스 임대</div>
+          </div>
+        )}
+        <button onClick={onToggle} className="p-1 rounded hover:bg-slate-700/40 text-slate-400 hover:text-white">
+          {open ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+        </button>
+      </div>
+      <nav className="flex-1 overflow-y-auto py-2">
+        {NAV_SECTIONS.map(section => (
+          <div key={section.group} className="mb-3">
+            {open && <div className="px-3 text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{section.group}</div>}
+            {section.items.map(item => {
+              const Icon = item.icon;
+              const hasChildren = !!item.children;
+              const isExpanded = hasChildren ? !!expanded[item.label] : false;
+              return (
+                <div key={item.label}>
+                  <div onClick={() => hasChildren && toggle(item.label)}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer transition select-none ${item.active ? 'text-white bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/30'}`}>
+                    <Icon size={13} strokeWidth={1.75} />
+                    {open && <span className="font-medium flex-1">{item.label}</span>}
+                    {open && hasChildren && (
+                      <ChevronDown size={11} className="text-slate-400 transition-transform duration-200"
+                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+                    )}
+                  </div>
+                  {open && hasChildren && isExpanded && (
+                    <div className="ml-6 mb-1">
+                      {item.children.map(child => (
+                        <div key={child} className={`px-3 py-1 text-[11px] cursor-pointer transition ${item.activeChild === child ? 'text-indigo-300 font-semibold border-l-2 border-indigo-400 pl-2.5' : 'text-slate-400 hover:text-slate-200'}`}>
+                          {child}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+      {open && (
+        <div className="px-3 py-2 border-t border-slate-700/40 flex items-center gap-2 flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[10px] font-bold flex-shrink-0">LM</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold truncate">장한덕 본부장</div>
+            <div className="text-[9px] text-slate-400 truncate">LM본부 · 관리자</div>
+          </div>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+/* ============================================================
+ * FilterBar (요구사항 8)
+ * ============================================================ */
+function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFilterValue, activeRegions, setActiveRegions, resetFilters, cartCount, onCartClick }) {
+  const updateRange = (key, field, val) =>
+    setFilters({ ...filters, [key]: { ...filters[key], [field]: val } });
+
+  return (
+    <header className="bg-white border-b border-slate-200 flex-shrink-0">
+      <div className="px-5 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Sparkles size={14} className="text-indigo-600" />
+          <h1 className="font-bold text-[15px] text-slate-900">빌딩 · 지도 기반</h1>
+          <span className="text-[11px] text-slate-400">권역별 색상으로 공실 현황 확인</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 pr-3 border-r border-slate-200">
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mr-1">권역</span>
+            {Object.entries(REGION_COLORS).map(([key, conf]) => {
+              const active = activeRegions.includes(key);
+              return (
+                <button key={key}
+                  onClick={() => setActiveRegions(active ? activeRegions.filter(r => r !== key) : [...activeRegions, key])}
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition ${active ? 'text-white shadow-sm' : 'bg-white text-slate-400 border-slate-200'}`}
+                  style={active ? { backgroundColor: conf.bg, borderColor: conf.bg } : {}}>
+                  {conf.name}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={resetFilters} className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-indigo-600 px-2 py-1 rounded transition">
+            <RotateCcw size={11} /> 초기화
+          </button>
+          <button onClick={onCartClick}
+            className="relative px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 flex items-center gap-1">
+            <ShoppingBag size={12} /> 담긴 매물 보기
+            {cartCount > 0 && (
+              <span className="ml-0.5 px-1.5 py-0 text-[10px] font-bold bg-indigo-600 text-white rounded-full">{cartCount}</span>
+            )}
+          </button>
+          <button className="px-3 py-1.5 text-[11px] font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1 shadow-sm">
+            <Plus size={12} /> 빌딩 등록
+          </button>
+        </div>
+      </div>
+
+      <div className="px-5 py-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100">
+        <span className="text-[11px] font-bold text-slate-600 mr-1 flex-shrink-0">필터</span>
+        {FILTER_DEFS.map(def => {
+          const isOpen = openFilterKey === def.key;
+          const hasValue = hasFilterValue(def.key);
+          const val = filters[def.key];
+
+          return (
+            <div key={def.key} className="relative">
+              <button onClick={() => setOpenFilterKey(isOpen ? null : def.key)}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition flex-shrink-0
+                  ${isOpen ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' :
+                    hasValue ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                {def.label}
+                {def.unit && <span className={isOpen ? 'text-indigo-200' : 'text-slate-400'}>({def.unit})</span>}
+                {hasValue && !isOpen && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+                <ChevronDown size={11} className="transition-transform"
+                  style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+              </button>
+
+              {isOpen && (
+                <div className="absolute top-full left-0 mt-1.5 z-50 bg-white rounded-xl shadow-2xl border border-slate-200 p-3.5 min-w-[280px]">
+                  <div className="text-[11px] font-bold text-slate-700 mb-2.5">
+                    {def.label} {def.unit && <span className="text-slate-400 font-normal">({def.unit})</span>}
+                  </div>
+
+                  {def.type === 'range' && (
+                    <div className="flex items-center gap-2">
+                      <input type="number" placeholder="최소" value={val.min}
+                        onChange={(e) => updateRange(def.key, 'min', e.target.value)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-slate-200 rounded-md focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none bg-white" />
+                      <span className="text-slate-400 text-xs">~</span>
+                      <input type="number" placeholder="최대" value={val.max}
+                        onChange={(e) => updateRange(def.key, 'max', e.target.value)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-slate-200 rounded-md focus:border-indigo-400 focus:ring-1 focus:ring-indigo-100 outline-none bg-white" />
+                    </div>
+                  )}
+
+                  {def.type === 'yn' && (
+                    <div className="flex gap-1.5">
+                      {['Y', 'N'].map(opt => (
+                        <button key={opt}
+                          onClick={() => setFilters({ ...filters, [def.key]: val === opt ? null : opt })}
+                          className={`flex-1 px-4 py-1.5 text-[11px] font-bold rounded-md transition ${val === opt ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {def.type === 'multi' && (
+                    <div className="flex flex-col gap-1">
+                      {def.options.map(opt => {
+                        const selected = val.includes(opt);
+                        return (
+                          <button key={opt}
+                            onClick={() => setFilters({ ...filters, [def.key]: selected ? val.filter(o => o !== opt) : [...val, opt] })}
+                            className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition text-left ${selected ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button onClick={() => setFilters({ ...filters, [def.key]: def.type === 'range' ? { min: '', max: '' } : (def.type === 'multi' ? [] : null) })}
+                      className="text-[11px] text-slate-500 hover:text-slate-700">이 필터 초기화</button>
+                    <button onClick={() => setOpenFilterKey(null)}
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-slate-700 text-white rounded-md hover:bg-slate-800">적용 · 닫기</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </header>
+  );
+}
+
+/* ============================================================
+ * KakaoMap (요구사항 5, 6, 7)
+ * - 실제 카카오맵 SDK 사용
+ * - mapRef: 지도 객체
+ * - overlaysRef: 마커 데이터
+ * - 추후 DB 연동 시 BUILDINGS 배열만 fetch 결과로 교체
+ * ============================================================ */
+function KakaoMap({ buildings, selectedId, onMarkerClick }) {
+  const mapRef = useRef(null);
+  const overlaysRef = useRef({});
+  const [mapStatus, setMapStatus] = useState('loading'); // 'loading' | 'ready' | 'no-key' | 'failed'
+
+  // 지도 초기화 (1회)
+  useEffect(() => {
+    if (KAKAO_API_KEY === 'YOUR_KAKAO_MAP_API_KEY') {
+      setMapStatus('no-key');
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId;
+
+    const initMap = () => {
+      if (cancelled) return;
+      window.kakao.maps.load(() => {
+        if (cancelled) return;
+        const container = document.getElementById('kakao-map-container');
+        if (!container) return;
+        const map = new window.kakao.maps.Map(container, {
+          center: new window.kakao.maps.LatLng(37.52, 127.0),
+          level: 9,
+        });
+        mapRef.current = map;
+
+        // 모든 빌딩이 보이도록 범위 조정
+        if (buildings.length > 0) {
+          const bounds = new window.kakao.maps.LatLngBounds();
+          buildings.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
+          map.setBounds(bounds);
+        }
+        setMapStatus('ready');
+      });
+    };
+
+    if (window.kakao && window.kakao.maps) {
+      initMap();
+    } else {
+      const script = document.createElement('script');
+      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_API_KEY}&autoload=false`;
+      script.async = true;
+      script.onload = initMap;
+      script.onerror = () => { if (!cancelled) setMapStatus('failed'); };
+      document.head.appendChild(script);
+      // 안전장치: 5초 후에도 안 뜨면 실패
+      timeoutId = setTimeout(() => {
+        if (!cancelled && mapStatus === 'loading') setMapStatus('failed');
+      }, 5000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 마커 업데이트 (buildings/selectedId 변경 시)
+  useEffect(() => {
+    if (mapStatus !== 'ready' || !mapRef.current) return;
+
+    // 기존 오버레이 모두 제거
+    Object.values(overlaysRef.current).forEach(o => o.setMap(null));
+    overlaysRef.current = {};
+
+    buildings.forEach(b => {
+      const isSelected = selectedId === b.id;
+      const color = REGION_COLORS[b.region].bg;
+
+      const div = document.createElement('div');
+      div.className = 'gm-marker';
+      div.style.cursor = 'pointer';
+      div.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;transform:translate(0,-100%);">
+          <div style="background:${isSelected ? color : '#1E293B'};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);margin-bottom:2px;${isSelected ? 'transform:scale(1.08);' : ''}">
+            ${b.name}
+          </div>
+          <svg width="${isSelected ? 28 : 22}" height="${isSelected ? 38 : 30}" viewBox="0 0 20 28" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.35));">
+            <path d="M 10 0 C 4.5 0, 0 4.5, 0 10 C 0 16, 10 28, 10 28 C 10 28, 20 16, 20 10 C 20 4.5, 15.5 0, 10 0 Z"
+                  fill="${color}" stroke="white" stroke-width="1.5"/>
+            <circle cx="10" cy="10" r="3.5" fill="white"/>
+          </svg>
+        </div>
+      `;
+      div.onclick = () => onMarkerClick(b.id);
+
+      const overlay = new window.kakao.maps.CustomOverlay({
+        position: new window.kakao.maps.LatLng(b.lat, b.lng),
+        content: div,
+        yAnchor: 1,
+        xAnchor: 0.5,
+        zIndex: isSelected ? 100 : 10,
+      });
+      overlay.setMap(mapRef.current);
+      overlaysRef.current[b.id] = overlay;
+    });
+  }, [buildings, selectedId, mapStatus, onMarkerClick]);
+
+  // 선택된 빌딩으로 지도 이동
+  useEffect(() => {
+    if (mapStatus !== 'ready' || !mapRef.current || !selectedId) return;
+    const building = buildings.find(b => b.id === selectedId);
+    if (!building) return;
+    mapRef.current.panTo(new window.kakao.maps.LatLng(building.lat, building.lng));
+  }, [selectedId, buildings, mapStatus]);
+
+  if (mapStatus === 'no-key' || mapStatus === 'failed') {
+    return <MapFallback status={mapStatus} buildings={buildings} />;
+  }
+
+  return (
+    <>
+      <div id="kakao-map-container" className="absolute inset-0" />
+      {mapStatus === 'loading' && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 backdrop-blur-sm pointer-events-none">
+          <div className="text-[11px] text-slate-500">카카오맵 로딩 중...</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function MapFallback({ status, buildings }) {
+  return (
+    <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-6">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center">
+        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-amber-100 flex items-center justify-center">
+          <AlertCircle size={28} className="text-amber-600" />
+        </div>
+        <h3 className="text-[15px] font-bold text-slate-800 mb-2">
+          {status === 'no-key' ? '카카오맵 API 키를 입력해주세요' : '카카오맵 로딩 실패'}
+        </h3>
+        <p className="text-[11px] text-slate-600 mb-4 leading-relaxed">
+          {status === 'no-key' ? (
+            <>HTML 파일 상단의 <code className="px-1.5 py-0.5 bg-slate-100 rounded font-mono text-[10px]">KAKAO_API_KEY</code> 상수의 값을 본인의 카카오 개발자 키로 변경하세요.<br/>
+            <a href="https://developers.kakao.com" target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline font-semibold">developers.kakao.com</a>에서 무료 발급 가능</>
+          ) : (
+            <>네트워크 연결 또는 API 키를 확인해주세요. 도메인 등록도 필요할 수 있습니다.</>
+          )}
+        </p>
+        <div className="text-[11px] text-slate-500 bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div className="font-bold text-slate-700 mb-1">현재 {buildings.length}개 빌딩 로드됨</div>
+          <div>우측 리스트 / 상세 패널은 정상 작동 중</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MapLegend() {
+  return (
+    <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-slate-200 px-3 py-2 z-10">
+      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">권역 범례</div>
+      <div className="space-y-1">
+        {Object.entries(REGION_COLORS).map(([key, conf]) => (
+          <div key={key} className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: conf.bg }} />
+            <span className="text-[10px] font-semibold text-slate-700">{conf.name}</span>
+            <span className="text-[9px] text-slate-400">{conf.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MapStats({ count, regionCount }) {
+  return (
+    <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-slate-200 px-3 py-2 z-10">
+      <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">표시 중</div>
+      <div className="text-xl font-bold text-slate-900">{count}<span className="text-xs font-normal text-slate-500 ml-0.5">개</span></div>
+      <div className="text-[9px] text-slate-500">권역 {regionCount}/6</div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * DetailCard
+ * ============================================================ */
+function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVacancies, cart }) {
+  const color = REGION_COLORS[building.region];
+  const photoSlots = ['외관 사진', '내부 사진 1', '내부 사진 2', '내부 사진 3'];
+
+  const totalArea = sumVacancyArea(building);
+  const totalNet  = sumVacancyNet(building);
+  const avgNoc    = avgVacancyNoc(building);
+
+  const isInCart = (v) => cart.some(item => item.id === `${building.id}-${v.floor}`);
+
+  return (
+    <section className="w-[280px] bg-white border-l border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
+      <div className="px-3 py-2.5 border-b border-slate-200 text-center flex-shrink-0">
+        <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">빌딩 이름</div>
+        <h2 className="font-bold text-[14px] text-slate-900 tracking-tight truncate" title={building.name}>{building.name}</h2>
+        <div className="text-[9px] text-slate-500 mt-0.5 truncate" title={building.address}>
+          <MapPin size={8} className="inline mr-0.5" />{building.address}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
+          <ImageIcon size={28} className="text-slate-400" />
+          <div className="absolute bottom-1.5 left-1.5 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded">{photoSlots[photoIdx]}</div>
+          {photoIdx > 0 && (
+            <button onClick={() => setPhotoIdx(photoIdx - 1)}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white">
+              <ChevronLeft size={12} />
+            </button>
+          )}
+          <button onClick={() => setPhotoIdx(Math.min(photoSlots.length - 1, photoIdx + 1))}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white">
+            <ChevronRight size={12} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <div className="px-3 py-2 border-r border-slate-100">
+            <div className="text-[9px] font-semibold text-slate-500 uppercase mb-0.5">권역</div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color.bg }} />
+              <span className="text-[12px] font-bold" style={{ color: color.text }}>{color.name}</span>
+            </div>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[9px] font-semibold text-slate-500 uppercase mb-0.5">전속</div>
+            <div className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${building.exclusive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+              {building.exclusive ? '전속' : '비전속'}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <KV label="규모"        value={formatFloors(building)} border />
+          <KV label="준공/리뉴얼" value={formatBuilt(building)} />
+        </div>
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <KV label="연면적" value={`${building.area.toLocaleString()}평`} border />
+          <KV label="전용률" value={`${building.occupancy}%`} />
+        </div>
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <KV label="기준 임대(평)" value={building.baseLease} border />
+          <KV label="기준 전용(평)" value={building.baseNet} />
+        </div>
+        <div className="grid grid-cols-2 border-b border-slate-100">
+          <KV label="NOC" value={building.noc.toLocaleString()} border />
+          <KV label="주차" value={building.parking} />
+        </div>
+
+        <div className="px-3 py-2.5 border-b border-slate-100">
+          <div className="text-[10px] font-bold text-slate-700 mb-1.5">공실 현황</div>
+          <div className="grid grid-cols-12 gap-0 text-[8px] font-semibold text-slate-500 uppercase mb-1 pb-1 border-b border-slate-200">
+            <div className="col-span-2">층</div>
+            <div className="col-span-2 text-right">임대</div>
+            <div className="col-span-2 text-right">전용</div>
+            <div className="col-span-1 text-right">NOC</div>
+            <div className="col-span-3 pl-2">입주 시기</div>
+            <div className="col-span-2 text-right">담기</div>
+          </div>
+          {building.vacancies.map((v, i) => {
+            const inCart = isInCart(v);
+            return (
+              <div key={i} className="grid grid-cols-12 gap-0 text-[9px] py-1 border-b last:border-b-0 border-slate-50 items-center">
+                <div className="col-span-2 font-bold">{v.floor}</div>
+                <div className="col-span-2 text-right">{v.area}</div>
+                <div className="col-span-2 text-right">{v.net}</div>
+                <div className="col-span-1 text-right">{v.noc > 0 ? (v.noc/1000).toFixed(0) + 'k' : '-'}</div>
+                <div className="col-span-3 pl-2 text-slate-600 truncate">{v.when}</div>
+                <div className="col-span-2 text-right">
+                  <button onClick={() => onAddVacancy(building, v)} disabled={inCart}
+                    className={`text-[8px] font-bold ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                    {inCart ? '담김' : '+ 담기'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="grid grid-cols-12 gap-0 text-[9px] py-1.5 mt-1 bg-slate-50 -mx-3 px-3 items-center font-semibold">
+            <div className="col-span-2 font-bold text-slate-800">총 공실</div>
+            <div className="col-span-2 text-right">{totalArea.toFixed(0)}</div>
+            <div className="col-span-2 text-right">{totalNet.toFixed(0)}</div>
+            <div className="col-span-1 text-right">{avgNoc > 0 ? (avgNoc/1000).toFixed(0) + 'k' : '-'}</div>
+            <div className="col-span-5 text-right">
+              <button onClick={() => onAddAllVacancies(building)}
+                className="px-2.5 py-1 text-[9px] font-bold text-white rounded transition hover:opacity-90"
+                style={{ backgroundColor: color.bg }}>
+                전체 담기
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="px-3 py-2.5 border-t border-slate-200 flex-shrink-0">
+        <button className="w-full py-2 text-[11px] font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition flex items-center justify-center gap-1.5"
+          style={{ backgroundColor: color.bg }}>
+          건물 상세보기 <ChevronRight size={12} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function KV({ label, value, border }) {
+  return (
+    <div className={`px-3 py-2 ${border ? 'border-r border-slate-100' : ''}`}>
+      <div className="text-[9px] font-semibold text-slate-500 uppercase mb-0.5">{label}</div>
+      <div className="text-[11px] font-bold text-slate-900 truncate">{value}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * CompactList
+ * ============================================================ */
+function CompactList({ buildings, selectedId, onSelect }) {
+  return (
+    <aside className="w-[220px] bg-slate-50 border-l border-slate-200 flex flex-col flex-shrink-0">
+      <div className="px-3 py-2.5 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0">
+        <span className="text-[11px] font-bold text-slate-700">간략 리스트</span>
+        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">{buildings.length}개</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+        {buildings.map(b => (
+          <CompactItem key={b.id} building={b} selected={selectedId === b.id} onSelect={() => onSelect(b.id)} />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function CompactItem({ building, selected, onSelect }) {
+  const color = REGION_COLORS[building.region];
+  return (
+    <div onClick={onSelect}
+      className={`bg-white rounded-lg border overflow-hidden cursor-pointer transition ${selected ? 'border-indigo-400 shadow-md ring-2 ring-indigo-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
+      <div className="flex gap-2 p-2">
+        <div className="w-12 h-12 rounded bg-gradient-to-br from-slate-200 to-slate-300 flex-shrink-0 flex items-center justify-center relative overflow-hidden">
+          <ImageIcon size={14} className="text-slate-400" />
+          <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: color.bg }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 mb-0.5">
+            <span className="px-1 py-px text-[8px] font-bold rounded" style={{ backgroundColor: color.light, color: color.text }}>{color.name}</span>
+            {building.exclusive && <span className="text-[8px] font-bold text-indigo-600">전속</span>}
+          </div>
+          <div className="text-[10px] font-bold text-slate-900 truncate">{building.name}</div>
+          <div className="text-[9px] text-slate-500 truncate flex items-center gap-0.5">
+            <MapPin size={8} /> {building.address}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-px bg-slate-100">
+        <button onClick={(e) => { e.stopPropagation(); onSelect(); }}
+          className="py-1.5 text-[10px] font-bold bg-white text-slate-700 hover:bg-slate-50">요약 이동</button>
+        <button onClick={(e) => e.stopPropagation()}
+          className="py-1.5 text-[10px] font-bold text-white hover:opacity-90"
+          style={{ backgroundColor: color.bg }}>상세 이동</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * CartDrawer (요구사항 1)
+ * ============================================================ */
+function CartDrawer({ cart, onClose, onRemove, onClear }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed top-0 right-0 h-full w-[360px] bg-white shadow-2xl z-50 flex flex-col">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <ShoppingBag size={16} className="text-indigo-600" />
+            <h3 className="font-bold text-[14px]">담긴 매물</h3>
+            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">{cart.length}개</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-500">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-6">
+              <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <ShoppingBag size={22} className="text-slate-400" />
+              </div>
+              <div className="text-[13px] font-semibold text-slate-700">담긴 매물이 없습니다</div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                건물 상세에서 "+ 담기" 또는<br />"전체 담기"를 눌러 추가하세요
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 space-y-2">
+              {cart.map(item => {
+                const color = REGION_COLORS[item.region];
+                return (
+                  <div key={item.id} className="bg-slate-50 rounded-lg border border-slate-200 p-2.5">
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="px-1 py-px text-[8px] font-bold rounded" style={{ backgroundColor: color.light, color: color.text }}>{color.name}</span>
+                          <span className="text-[8px] font-bold text-slate-500">{item.floor}</span>
+                        </div>
+                        <div className="text-[12px] font-bold text-slate-900 truncate">{item.buildingName}</div>
+                      </div>
+                      <button onClick={() => onRemove(item.id)}
+                        className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex-shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5 text-center bg-white rounded p-1.5 border border-slate-100">
+                      <div>
+                        <div className="text-[8px] text-slate-500">임대</div>
+                        <div className="text-[10px] font-bold">{item.area}</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] text-slate-500">전용</div>
+                        <div className="text-[10px] font-bold">{item.net}</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] text-slate-500">NOC</div>
+                        <div className="text-[10px] font-bold">{item.noc > 0 ? (item.noc/1000).toFixed(0)+'k' : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[8px] text-slate-500">입주</div>
+                        <div className="text-[10px] font-bold truncate" title={item.when}>{item.when}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {cart.length > 0 && (
+          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0">
+            <button onClick={onClear}
+              className="text-[11px] text-slate-500 hover:text-rose-600">전체 비우기</button>
+            <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+              매물 리스트 작성 ({cart.length})
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<GenstarMate />);
+</script>
+</body>
+</html>
+ps://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=d8b753994f6239ff841c0bb7015d7e9c&autoload=false"></script>
 <style>
