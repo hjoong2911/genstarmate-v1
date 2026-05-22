@@ -8,7 +8,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d8b753994f6239ff841c0bb7015d7e9c&autoload=false"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d8b753994f6239ff841c0bb7015d7e9c&autoload=false&libraries=services"></script>
 <style>
   html, body, #root { height: 100%; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
@@ -593,19 +593,22 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
   const mapRef = useRef(null);
   const overlaysRef = useRef({});
   const [mapReady, setMapReady] = useState(false);
+  // 주소 → 좌표 자동 변환 결과 캐시 (id → {lat, lng})
+  const [geocoded, setGeocoded] = useState({});
+  const [geoStatus, setGeoStatus] = useState({ done: 0, total: 0, failed: [] });
 
-  // 지도 초기화 (1회)
+  // 주소 기준 좌표 얻기 (지오코딩 결과가 있으면 그것, 없으면 수동 입력값)
+  const resolvePos = useCallback((b) => {
+    const g = geocoded[b.id];
+    return g ? { lat: g.lat, lng: g.lng } : { lat: b.lat, lng: b.lng };
+  }, [geocoded]);
+
+  // 지도 초기화 + 모든 빌딩 주소 지오코딩 (1회)
   useEffect(() => {
-    console.log("MAP EFFECT START");
-    if (!window.kakao || !window.kakao.maps) {
-      console.log("KAKAO NOT AVAILABLE", window.kakao);
-      return;
-    }
+    if (!window.kakao || !window.kakao.maps) return;
 
     window.kakao.maps.load(() => {
-      console.log("KAKAO LOAD COMPLETE");
       const container = document.getElementById('kakao-map');
-      console.log("MAP CONTAINER", container, container ? container.offsetWidth + 'x' + container.offsetHeight : 'null');
       if (!container) return;
 
       const options = {
@@ -613,19 +616,37 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
         level: 5,
       };
       const map = new window.kakao.maps.Map(container, options);
-      console.log("MAP CREATED", map);
       mapRef.current = map;
 
-      // flex 컨테이너에서 지도가 안 그려지는 경우 대비 - 강제 relayout
       setTimeout(() => {
         if (!mapRef.current) return;
         mapRef.current.relayout();
-        console.log("MAP RELAYOUT DONE");
 
-        // 모든 빌딩이 보이도록 범위 조정
-        if (buildings.length > 0) {
+        // ===== 지오코딩: 모든 빌딩 주소를 좌표로 변환 =====
+        if (window.kakao.maps.services && window.kakao.maps.services.Geocoder) {
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          setGeoStatus({ done: 0, total: BUILDINGS.length, failed: [] });
+
+          let done = 0;
+          const failed = [];
+          BUILDINGS.forEach(b => {
+            geocoder.addressSearch(b.address, (result, status) => {
+              done += 1;
+              if (status === window.kakao.maps.services.Status.OK && result[0]) {
+                const r = result[0];
+                setGeocoded(prev => ({ ...prev, [b.id]: { lat: parseFloat(r.y), lng: parseFloat(r.x) } }));
+                console.log(`[geocode OK] ${b.name}: ${r.y}, ${r.x}`);
+              } else {
+                failed.push(b);
+                console.warn(`[geocode FAIL] status=${status} ${b.name} (${b.address})`);
+              }
+              setGeoStatus({ done, total: BUILDINGS.length, failed: [...failed] });
+            });
+          });
+        } else {
+          // 지오코더 사용 불가 시 수동 좌표로 fallback
           const bounds = new window.kakao.maps.LatLngBounds();
-          buildings.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
+          BUILDINGS.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
           mapRef.current.setBounds(bounds);
         }
       }, 100);
@@ -635,7 +656,19 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 마커 업데이트 (buildings/selectedId 변경 시)
+  // 지오코딩이 모두 끝나면 한 번 bounds 재조정
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    if (geoStatus.total === 0 || geoStatus.done < geoStatus.total) return;
+    const bounds = new window.kakao.maps.LatLngBounds();
+    BUILDINGS.forEach(b => {
+      const p = geocoded[b.id] || { lat: b.lat, lng: b.lng };
+      bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng));
+    });
+    mapRef.current.setBounds(bounds);
+  }, [mapReady, geoStatus.done, geoStatus.total]);
+
+  // 마커 업데이트 (buildings/selectedId/지오코딩 변경 시)
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
 
@@ -646,6 +679,7 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
     buildings.forEach(b => {
       const isSelected = selectedId === b.id;
       const color = REGION_COLORS[b.region].bg;
+      const pos = resolvePos(b);
 
       const div = document.createElement('div');
       div.className = 'gm-marker';
@@ -665,7 +699,7 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       div.onclick = () => onMarkerClick(b.id);
 
       const overlay = new window.kakao.maps.CustomOverlay({
-        position: new window.kakao.maps.LatLng(b.lat, b.lng),
+        position: new window.kakao.maps.LatLng(pos.lat, pos.lng),
         content: div,
         yAnchor: 1,
         xAnchor: 0.5,
@@ -674,34 +708,44 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       overlay.setMap(mapRef.current);
       overlaysRef.current[b.id] = overlay;
     });
-  }, [buildings, selectedId, mapReady, onMarkerClick]);
+  }, [buildings, selectedId, mapReady, geocoded, onMarkerClick, resolvePos]);
 
   // 선택된 빌딩으로 지도 이동
   useEffect(() => {
     if (!mapReady || !mapRef.current || !selectedId) return;
     const building = buildings.find(b => b.id === selectedId);
     if (!building) return;
-    mapRef.current.panTo(new window.kakao.maps.LatLng(building.lat, building.lng));
-  }, [selectedId, buildings, mapReady]);
+    const pos = resolvePos(building);
+    mapRef.current.panTo(new window.kakao.maps.LatLng(pos.lat, pos.lng));
+  }, [selectedId, buildings, mapReady, geocoded, resolvePos]);
 
   return (
-    <div
-      id="kakao-map"
-      style={{
-        width: '100%',
-        height: '100%',
-        minHeight: '100vh',
-        background: 'yellow',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '20px',
-        fontWeight: 'bold',
-        color: '#333',
-      }}
-    >
-      KAKAO MAP AREA ACTIVE
-    </div>
+    <>
+      <div
+        id="kakao-map"
+        style={{
+          width: '100%',
+          height: '100%',
+          background: '#e8eef5',
+        }}
+      />
+      {/* 지오코딩 진행/실패 표시 */}
+      {geoStatus.total > 0 && geoStatus.done < geoStatus.total && (
+        <div className="absolute top-4 right-4 z-20 bg-white/95 backdrop-blur-sm rounded-lg shadow-md border border-slate-200 px-3 py-1.5">
+          <div className="text-[10px] font-semibold text-slate-700">
+            주소 좌표 변환 중... <span className="text-indigo-600 font-bold">{geoStatus.done}/{geoStatus.total}</span>
+          </div>
+        </div>
+      )}
+      {geoStatus.total > 0 && geoStatus.done === geoStatus.total && geoStatus.failed.length > 0 && (
+        <div className="absolute top-4 right-4 z-20 bg-amber-50 border border-amber-200 rounded-lg shadow-md px-3 py-1.5 max-w-[260px]">
+          <div className="text-[10px] font-bold text-amber-800 mb-0.5">⚠ 주소 변환 실패 {geoStatus.failed.length}건</div>
+          <div className="text-[9px] text-amber-700 leading-tight">
+            {geoStatus.failed.map(f => f.name).join(', ')} — 수동 좌표 사용 중
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
