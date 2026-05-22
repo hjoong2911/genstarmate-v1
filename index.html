@@ -9,6 +9,7 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d8b753994f6239ff841c0bb7015d7e9c&autoload=false&libraries=services"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   html, body, #root { height: 100%; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
@@ -73,144 +74,249 @@ const REGION_COLORS = {
  * 빌딩 데이터 - 10개 샘플 (요구사항 4)
  * 추후 API/DB로 교체 시 이 배열만 fetch 결과로 대체하면 됨
  * ============================================================ */
+/* ============================================================
+ * 빌딩 데이터 — GenstarMate 실제 7개 빌딩
+ * ============================================================ */
 const BUILDINGS = [
   {
-    id: 1, name: '성지빌딩', region: 'CBD',
-    address: '서울특별시 종로구 종로 398',
-    lat: 37.5712, lng: 127.0033,
-    built: 2026, renovated: null,
-    aboveFloors: 13, belowFloors: 2,
-    area: 2398.05, occupancy: 77.95,
-    baseLease: 156.78, baseNet: 122.21, noc: 150205,
+    id: 1, name: '타워50 TOWER50', alias: '구, 골든브릿지빌딩', region: 'CBD',
+    address: '서울특별시 서대문구 충정로 50',
+    lat: 37.5635, lng: 126.9659,
+    built: 1987, renovated: 2025,
+    aboveFloors: 17, belowFloors: 4,
+    area: 9648.2, occupancy: 55,
+    scale: '중대형',
+    contractType: '전속 유형 선택',
+    baseLease: 705.6, baseNet: 402, noc: 239002,
     exclusive: false, parking: '자주식',
+    elevators: { passenger: 3, emergency: 1, total: 4 },
+    parkingDetail: { total: 146, self: 146, mechanical: 0 },
+    parkingFree: '1대 / 100평',
+    parkingPaid: '월 14.3만원 / 대 (VAT별도)',
+    heating: '냉/난방 유형 선택',
+    notes: '2025년 3월 리모델링 준공 완료 / 1층 리테일(관리비 ...)',
+    locationInfo: '2,5호선 충정로역, 5호선 서대문역 도보 5분',
+    contacts: [
+      { name: '장한덕', role: '본부장/LM본부/젠스타메이트', phone: '010-2240-2321', phone2: '02-3775-7220', email: 'hdjang@genstarmate.com' },
+      { name: '주정수', role: '부장/LM본부/젠스타메이트',  phone: '010-3625-9311', phone2: '02-3775-7229', email: 'jhjoo@genstarmate.com' },
+      { name: '박환웅', role: '이사/LM본부/젠스타메이트',  phone: '010-9238-7475', phone2: '02-2003-8013', email: 'hwpark@genstarmate.com' },
+    ],
+    baseStandard: { deposit: 1190000, rent: 119000, mgmt: 41000, noc: 239002, netArea: 402, leaseArea: 705.6, occupancyRate: 56.97, rf: 1, fo: 4, ti: 800000 },
     vacancies: [
-      { floor: '13층', area: 171.96, net: 137.38, noc: 150205, when: '협의' },
-      { floor: '12층', area: 171.96, net: 137.38, noc: 150205, when: '협의' },
-    ]
+      { status: '모집중', type: '임대', basement: '지상', floor: '9층', area: 522.66, net: 253.26, occupancyRate: 48.46, when: '즉시', depositPerPy: 1190000, rentPerPy: 119000, mgmtPerPy: 41000, noc: 246183, rf: 1, fo: 4, ti: 800000 },
+      { status: '모집중', type: '임대', basement: '지상', floor: '8층', area: 705.62, net: 377.35, occupancyRate: 53.48, when: '즉시', depositPerPy: 1190000, rentPerPy: 119000, mgmtPerPy: 41000, noc: 246183, rf: 1, fo: 4, ti: 800000 },
+    ],
+    memos: [
+      { author: '김성준 부장', dt: '2026-03-24 10:19:31', text: '1층 임무시설 변경 가능, 1/4/80 조건' },
+      { author: '김민희 과장', dt: '2026-02-06 11:01:08', text: '2층 FAVOR: 2/10/150만원' },
+      { author: '김민희 과장', dt: '2026-02-05 17:11:07', text: 'favor : RF 1개 고정으로 FO, TI 협의하여 NOC 낮출 수 있음' },
+      { author: '김성준 부장', dt: '2026-01-28 08:55:58', text: '노사발전위원회 계약 700평' },
+      { author: '김민희 과장', dt: '2026-01-22 08:48:01', text: '마케팅 Favor: RF 1 / FO 4 / TI 80만원' },
+      { author: '김민희 과장', dt: '2025-12-11 17:03:08', text: '- 5층 롯데카드 : 311.61평, 540.3평 /RF3.5,4개월 수준 - 4층 AIA : 대략 300평 수준 협의 중, 계약 남인 진' },
+      { author: '변진국 대리', dt: '2025-11-24 10:49:03', text: 'F/O 4, R/F 2, T.I. 80만원 출처: 세빌스' },
+      { author: '김민희 과장', dt: '2025-11-21 09:58:48', text: '25.12.23 계약건까지 NOC 18-19까지 협의 가능 및 수수료 프로모션 진행' },
+    ],
   },
   {
-    id: 2, name: '아우디타워', region: 'GBD',
-    address: '서울특별시 강남구 도산대로 306',
-    lat: 37.5236, lng: 127.0376,
-    built: 1989, renovated: 2018,
-    aboveFloors: 9, belowFloors: 1,
-    area: 1875.81, occupancy: 80.56,
-    baseLease: 210.20, baseNet: 169.33, noc: 218086,
+    id: 2, name: '삼성생명 서초타워', region: 'GBD',
+    address: '서울특별시 서초구 서초대로74길 4',
+    lat: 37.4946, lng: 127.0287,
+    built: 2007, renovated: null,
+    aboveFloors: 34, belowFloors: 7,
+    area: 33475, occupancy: 51.64,
+    scale: '초대형',
+    contractType: '전속 유형 선택',
+    baseLease: 1009.9, baseNet: 521.52, noc: 392148,
+    exclusive: false, parking: '자주식',
+    elevators: { passenger: 19, emergency: 2, total: 21 },
+    parkingDetail: { total: 500, self: 500, mechanical: 0 },
+    parkingFree: '1대 / 76평',
+    parkingPaid: '없음',
+    heating: '냉/난방 유형 선택',
+    notes: '기존 임차인 원상복구 비용 협의 지급',
+    locationInfo: '2호선, 신분당선 강남역 지하연결',
+    contacts: [
+      { name: '백종인', role: '팀장/LM팀/ACRETREE', phone: '010-5311-4327', phone2: '02-3704-8872', email: 'jongin@acretree.com' },
+      { name: '조은종', role: '대리/LM팀/ACRETREE', phone: '010-2094-5777', phone2: '02-3704-8872', email: 'gracejo@acretree.com' },
+      { name: '이승준', role: '이사/Office Advisory & Marketing/Savills', phone: '010-6249-9911', phone2: '02-2124-4116', email: 'shlee@savills.co.kr' },
+    ],
+    baseStandard: { deposit: 1520000, rent: 152000, mgmt: 53000, noc: 392148, netArea: 521.52, leaseArea: 1009.9, occupancyRate: 51.64, rf: null, fo: 1, ti: null },
+    vacancies: [
+      { status: '모집중', type: '임대', basement: '지상', floor: '-', area: 481.31, net: 248.57, occupancyRate: 51.64, when: '협의', depositPerPy: 1707000, rentPerPy: 170700, mgmtPerPy: 57000, noc: null, rf: null, fo: null, ti: null },
+    ],
+    memos: [],
+  },
+  {
+    id: 3, name: '스테이트타워 남산', region: 'CBD',
+    address: '서울특별시 중구 퇴계로 100',
+    lat: 37.5605, lng: 126.9839,
+    built: 2011, renovated: null,
+    aboveFloors: 24, belowFloors: 6,
+    area: 20207, occupancy: 57.43,
+    scale: '초대형',
+    contractType: '해당 없음',
+    baseLease: 860.27, baseNet: 494.08, noc: 406087,
+    exclusive: false, parking: '자주식',
+    elevators: { passenger: 12, emergency: 2, total: 14 },
+    parkingDetail: { total: 300, self: 300, mechanical: 0 },
+    parkingFree: '1대 / 100평',
+    parkingPaid: '월 24.2만원 / 대 (VAT 포함)',
+    heating: '중앙 냉/난방',
+    notes: '분할 협의 가능',
+    locationInfo: '4호선 명동역 도보 2분',
+    contacts: [
+      { name: '장한덕', role: '본부장/LM본부/젠스타메이트', phone: '010-2240-2321', phone2: '02-3775-7220', email: 'hdjang@genstarmate.com' },
+      { name: '김성준', role: '부장/LM본부/젠스타메이트',  phone: '010-3333-8194', phone2: '02-2003-8087', email: 'sjunii@genstarmate.com' },
+      { name: '주정수', role: '부장/LM본부/젠스타메이트',  phone: '010-3625-9311', phone2: '02-3775-7229', email: 'jhjoo@genstarmate.com' },
+    ],
+    baseStandard: { deposit: 1780000, rent: 178000, mgmt: 64000, noc: 406087, netArea: 494.08, leaseArea: 860.27, occupancyRate: 57.43, rf: 0.5, fo: 1, ti: null },
+    vacancies: [
+      { status: '모집중', type: '임대', basement: '지상', floor: '9층', area: 860.27, net: 494.08, occupancyRate: 57.43, when: '즉시', depositPerPy: 1780000, rentPerPy: 178000, mgmtPerPy: 64000, noc: null, rf: 0.5, fo: 1, ti: null },
+      { status: '모집중', type: '임대', basement: '지상', floor: '8층', area: 210.13, net: 112.05, occupancyRate: 53.32, when: '즉시', depositPerPy: 1780000, rentPerPy: 178000, mgmtPerPy: 64000, noc: null, rf: 0.5, fo: 1, ti: null },
+    ],
+    memos: [
+      { author: '김성준 부장', dt: '2026-03-05 17:09:43', text: '8층, 기존 임차인(알리바바코리아) 증평 검토 @1,780,000 @178,000 간 @62,000 RF 0.5개월/' },
+      { author: '김성준 부장', dt: '2026-02-05 15:19:43', text: '지하소층 임차인측 원상복구 진행 조건, Fit out 6개월 제공' },
+      { author: '이경준 대리', dt: '2025-06-11 13:30:21', text: '10층 리치몬트 내부 증평' },
+      { author: '이경준 대리', dt: '2025-05-26 17:20:32', text: '7층(아빠넷) 7/30 중도퇴거 의향 RF 0.5/ FO 1(7월에 체결 인테리어 협의가능)' },
+      { author: '이경준 대리', dt: '2024-11-27 13:37:50', text: '9층 입차중인 임차사(리치몬트) 10일 초 LOI 제출했었으나 우선권은 없는 상황' },
+      { author: '이경준 대리', dt: '2024-11-27 13:37:46', text: '8층은 기존입차인(알디비) 증평 의사 보였으나, 보류중인 상태이고 신규 임차인 LOI 자유시 검토 한 예정' },
+      { author: '이경준 대리', dt: '2024-11-27 13:29:24', text: 'SCK캠피니 이전 _2025년 7월 공실 예정 (8, 9, 10층)' },
+      { author: '이경준 대리', dt: '2024-11-04 10:20:26', text: 'RF : 0.5 / FO:1' },
+    ],
+  },
+  {
+    id: 4, name: '대경타워', region: 'GBD',
+    address: '서울특별시 강남구 테헤란로34길 6',
+    lat: 37.5005, lng: 127.0345,
+    built: 2016, renovated: null,
+    aboveFloors: 15, belowFloors: 8,
+    area: 5262.33, occupancy: 51.24,
+    scale: '중대형',
+    contractType: '전속 유형 선택',
+    baseLease: 337.05, baseNet: 172.8, noc: 252478,
     exclusive: true, parking: '자주식',
+    elevators: { passenger: 3, emergency: 1, total: 4 },
+    parkingDetail: { total: 86, self: 86, mechanical: 0 },
+    parkingFree: '1대 / 100평',
+    parkingPaid: '추후 협의',
+    heating: '개별 냉/난방',
+    notes: '-',
+    locationInfo: '2호선 역삼역 도보 3분',
+    contacts: [
+      { name: '장한덕', role: '본부장/LM본부/젠스타메이트', phone: '010-2240-2321', phone2: '02-3775-7220', email: 'hdjang@genstarmate.com' },
+      { name: '임정수', role: '부장/LM본부/젠스타메이트',  phone: '010-9733-5021', phone2: '02-2003-8160', email: 'js.lim@genstarmate.com' },
+      { name: '최원규', role: '차장/LM본부/젠스타메이트',  phone: '010-2614-5021', phone2: '02-3775-7224', email: 'pk.choi@genstarmate.com' },
+    ],
+    baseStandard: { deposit: 1345000, rent: 134500, mgmt: 46500, noc: 252478, netArea: 172.8, leaseArea: 337.05, occupancyRate: 51.27, rf: 4, fo: 3, ti: null },
     vacancies: [
-      { floor: '6층', area: 210.20, net: 169.33, noc: 218086, when: '2026-07' },
-      { floor: '5층', area: 200.59, net: 160.30, noc: 218086, when: '2026-07' },
-    ]
+      { status: '모집중', type: '임대', basement: '지상', floor: '14층', area: 166.71, net: 85.47, occupancyRate: 51.27, when: '즉시', depositPerPy: 1345000, rentPerPy: 134500, mgmtPerPy: 46500, noc: 252478, rf: 4, fo: 3, ti: null },
+      { status: '모집중', type: '임대', basement: '지상', floor: '8층', area: 337.05, net: 172.8, occupancyRate: 51.27, when: '즉시', depositPerPy: 1345000, rentPerPy: 134500, mgmtPerPy: 46500, noc: 252478, rf: 4, fo: 3, ti: null },
+    ],
+    memos: [
+      { author: '임정수 부장', dt: '2026-05-14 08:52:23', text: '렌트프리 4개, 핏아웃 3개 / 면적에 관계없이 조건 풀림' },
+      { author: '임정수 부장', dt: '2026-03-13 14:50:11', text: '하나금융그룹 지체 계열사 2개층 LOI접수하였으나 진행은 되지 않는 상황' },
+      { author: '임정수 부장', dt: '2026-03-13 14:36:24', text: '입장수 컨택포인트 추가 / 하나자산신탁 컨피덴셜 수수료 200% / 규모가 작은 계약을 공격적인 Favor' },
+      { author: '김성준 부장', dt: '2026-01-27 10:48:07', text: '2/3 까지 받음' },
+      { author: '김성준 부장', dt: '2025-11-05 16:08:33', text: '1/1 바딤가' },
+    ],
   },
   {
-    id: 3, name: '유화증권빌딩', region: 'YBD',
-    address: '서울특별시 영등포구 국제금융로2길 36',
-    lat: 37.5260, lng: 126.9272,
-    built: 1994, renovated: null,
+    id: 5, name: '강남파이낸스플라자', region: 'GBD',
+    address: '서울특별시 강남구 테헤란로 419',
+    lat: 37.5061, lng: 127.0526,
+    built: 1994, renovated: 2018,
+    aboveFloors: 21, belowFloors: 6,
+    area: 7314, occupancy: 50.6,
+    scale: '중대형',
+    contractType: '전속 유형 선택',
+    baseLease: 390.56, baseNet: 197.58, noc: 270804,
+    exclusive: false, parking: '자주식',
+    elevators: { passenger: 4, emergency: 1, total: 5 },
+    parkingDetail: { total: 135, self: 92, mechanical: 0 },
+    parkingFree: '1대 / 80평',
+    parkingPaid: '월 17만원 / 대 (VAT별도)',
+    heating: '냉/난방 유형 선택',
+    notes: '건물 내 4층 및 13층 없음.',
+    locationInfo: '2호선,분당선 선릉역 도보 3분',
+    contacts: [
+      { name: '장한덕', role: '본부장/LM본부/젠스타메이트', phone: '010-2240-2321', phone2: '02-3775-7220', email: 'hdjang@genstarmate.com' },
+      { name: '김성준', role: '부장/LM본부/젠스타메이트',  phone: '010-3333-8194', phone2: '02-2003-8087', email: 'sjunii@genstarmate.com' },
+      { name: '권원빈', role: '팀장/그레이츠비',            phone: '010-6484-9774', phone2: '',              email: '' },
+    ],
+    baseStandard: { deposit: 1443000, rent: 144300, mgmt: 47800, noc: 270804, netArea: 197.58, leaseArea: 390.56, occupancyRate: 50.59, rf: 3.3, fo: 3, ti: 1300000 },
+    vacancies: [
+      { status: '계약완료', type: '임대', basement: '지상', floor: '21층', area: 395.71, net: 200.19, occupancyRate: 50.59, when: '즉시', depositPerPy: 1443000, rentPerPy: 144300, mgmtPerPy: 47800, noc: null, rf: null, fo: null, ti: null },
+      { status: '계약완료', type: '임대', basement: '지상', floor: '20층', area: 390.56, net: 197.58, occupancyRate: 50.59, when: '즉시', depositPerPy: 1443000, rentPerPy: 144300, mgmtPerPy: 47800, noc: null, rf: null, fo: null, ti: null },
+    ],
+    memos: [
+      { author: '임정수 부장', dt: '2026-01-12 17:12:00', text: '진평 1000평 이상 / 3.3 / 4(2개월은 관리비 면제) / 130만원' },
+      { author: '김성준 부장', dt: '2025-11-27 11:18:36', text: '고층부 2/3, 저층부 3/3' },
+      { author: '이경준 대리', dt: '2025-09-29 17:53:54', text: '9층 태승리크리아 임대차계약 완료' },
+      { author: '이경준 대리', dt: '2025-04-30 09:58:13', text: 'RF 2개월, FO2개월 (협의가능)' },
+      { author: '김성준 부장', dt: '2025-02-03 09:52:20', text: 'RF :1, FO : 3' },
+    ],
+  },
+  {
+    id: 6, name: '트윈시티남산', region: 'CBD',
+    address: '서울특별시 용산구 한강대로 366',
+    lat: 37.5510, lng: 126.9722,
+    built: 2015, renovated: null,
+    aboveFloors: 18, belowFloors: 2,
+    area: 11360, occupancy: 49.85,
+    scale: '대형',
+    contractType: '전속',
+    baseLease: 597.79, baseNet: 298.38, noc: 281863,
+    exclusive: true, parking: '자주식',
+    elevators: { passenger: 5, emergency: 1, total: 6 },
+    parkingDetail: { total: 136, self: 136, mechanical: 0 },
+    parkingFree: '1대 / 100평',
+    parkingPaid: '월 18만원 / 대 (VAT포함)',
+    heating: '냉/난방 유형 선택',
+    notes: 'B2 문화 및 집회시설',
+    locationInfo: '1, 4호선 서울역 연결',
+    contacts: [
+      { name: '김민희', role: '과장/LM본부/GenstarMate', phone: '010-2079-7053', phone2: '02-3775-7226', email: 'mh.kim@genstarmate.com' },
+      { name: '임정수', role: '부장/LM본부/젠스타메이트', phone: '010-9733-5021', phone2: '02-2003-8160', email: 'js.lim@genstarmate.com' },
+      { name: '최원규', role: '차장/LM본부/젠스타메이트', phone: '010-2614-5021', phone2: '02-3775-7224', email: 'pk.choi@genstarmate.com' },
+    ],
+    baseStandard: { deposit: 1270000, rent: 127000, mgmt: 47000, noc: 281863, netArea: 298.38, leaseArea: 597.79, occupancyRate: 49.91, rf: 3, fo: 1, ti: null },
+    vacancies: [
+      { status: '모집중', type: '임대', basement: '지상', floor: '3층', area: 110.88, net: 55.34, occupancyRate: 49.91, when: '2026-10', depositPerPy: 1270000, rentPerPy: 127000, mgmtPerPy: 47000, noc: null, rf: null, fo: null, ti: null },
+      { status: '모집중', type: '임대', basement: '지하', floor: '2층', area: 155.92, net: 66.76, occupancyRate: 42.82, when: '협의', depositPerPy: 450000, rentPerPy: 45000, mgmtPerPy: 23000, noc: null, rf: null, fo: null, ti: null },
+    ],
+    memos: [
+      { author: '김성준 부장', dt: '2026-04-21 11:32:20', text: '3/1' },
+      { author: '김민희 과장', dt: '2026-01-09 13:31:10', text: '지하 2층 면적 마케팅 제외(B2층 : 문화 및 집회시설 )' },
+      { author: '김성준 부장', dt: '2025-01-23 10:31:45', text: 'RF : 2' },
+    ],
+  },
+  {
+    id: 7, name: '역삼빌딩', region: 'GBD',
+    address: '서울특별시 강남구 테헤란로 114',
+    lat: 37.5004, lng: 127.0367,
+    built: 1996, renovated: null,
     aboveFloors: 20, belowFloors: 6,
-    area: 11843, occupancy: 44.94,
-    baseLease: 561.03, baseNet: 252.13, noc: 240856,
-    exclusive: false, parking: '기계식',
-    vacancies: [
-      { floor: '15층', area: 561.03, net: 252.13, noc: 240856, when: '2026-09' },
-      { floor: '14층', area: 561.03, net: 252.13, noc: 240856, when: '2026-09' },
-    ]
-  },
-  {
-    id: 4, name: '과천스마트케이 A동', region: 'BBD',
-    address: '경기 과천시 과천대로7길 20',
-    lat: 37.4308, lng: 127.0027,
-    built: 2022, renovated: null,
-    aboveFloors: 15, belowFloors: 4,
-    area: 40655, occupancy: 52.92,
-    baseLease: 1493, baseNet: 790.27, noc: 111985,
-    exclusive: false, parking: '자주식',
-    vacancies: [
-      { floor: '13층', area: 1493, net: 790, noc: 111985, when: '즉시' },
-      { floor: '11층', area: 964, net: 510, noc: 111985, when: '즉시' },
-    ]
-  },
-  {
-    id: 5, name: '세미콜론 문래 N-Tower', region: 'YBD',
-    address: '서울특별시 영등포구 문래로28길 25',
-    lat: 37.5176, lng: 126.9050,
-    built: 2017, renovated: null,
-    aboveFloors: 13, belowFloors: 5,
-    area: 29980, occupancy: 51.27,
-    baseLease: 1164.42, baseNet: 597.46, noc: 251142,
+    area: 10557, occupancy: 50.26,
+    scale: '대형',
+    contractType: '전속',
+    baseLease: 504.77, baseNet: 253.71, noc: 329630,
     exclusive: true, parking: '자주식',
-    vacancies: [
-      { floor: '11층', area: 1165.23, net: 597.46, noc: 251142, when: '협의' },
-      { floor: '10층', area: 746.21, net: 382.61, noc: 251142, when: '협의' },
-    ]
-  },
-  {
-    id: 6, name: '을지로3가 제9지구 업무시설', region: 'CBD',
-    address: '서울특별시 중구 을지로 일원',
-    lat: 37.5658, lng: 126.9920,
-    built: 2028, renovated: null,
-    aboveFloors: 19, belowFloors: 8,
-    area: 8371.97, occupancy: 52.49,
-    baseLease: 454.71, baseNet: 238.70, noc: 0,
-    exclusive: true, parking: '자주식',
-    vacancies: [
-      { floor: '19층', area: 454.71, net: 238.70, noc: 0, when: 'TBA' },
-      { floor: '18층', area: 454.71, net: 238.70, noc: 0, when: 'TBA' },
-    ]
-  },
-  {
-    id: 7, name: '분당M타워', region: 'BBD',
-    address: '경기 성남시 분당구 구미로 8',
-    lat: 37.3470, lng: 127.1080,
-    built: 2009, renovated: 2024,
-    aboveFloors: 8, belowFloors: 4,
-    area: 13952.9, occupancy: 56.91,
-    baseLease: 1732.52, baseNet: 986.02, noc: 190389,
-    exclusive: true, parking: '자주식',
-    vacancies: [
-      { floor: '3층 A', area: 299.95, net: 170.36, noc: 190389, when: '즉시' },
-      { floor: '3층 B', area: 181.40, net: 103.03, noc: 190389, when: '즉시' },
-    ]
-  },
-  {
-    id: 8, name: '잠원동 PFV', region: 'GBD',
-    address: '서울특별시 서초구 강남대로 573',
-    lat: 37.5146, lng: 127.0246,
-    built: 2026, renovated: null,
-    aboveFloors: 12, belowFloors: 8,
-    area: 8016, occupancy: 46.01,
-    baseLease: 600.27, baseNet: 276.21, noc: 396927,
-    exclusive: false, parking: '자주식',
-    vacancies: [
-      { floor: '12층', area: 463.90, net: 213.46, noc: 396927, when: '즉시' },
-      { floor: '11층', area: 524.17, net: 213.46, noc: 396927, when: '즉시' },
-    ]
-  },
-  {
-    id: 9, name: '케이스퀘어 마곡 T1', region: 'OTHERS',
-    address: '서울특별시 강서구 마곡중앙로 161',
-    lat: 37.5604, lng: 126.8260,
-    built: 2017, renovated: null,
-    aboveFloors: 19, belowFloors: 4,
-    area: 14500, occupancy: 55.0,
-    baseLease: 165, baseNet: 110, noc: 180000,
-    exclusive: false, parking: '자주식',
-    vacancies: [
-      { floor: '6층', area: 180, net: 130, noc: 180000, when: '즉시' },
-    ]
-  },
-  {
-    id: 10, name: '씨드큐브 창동', region: 'OUT',
-    address: '서울특별시 도봉구 마들로11길 64',
-    lat: 37.6538, lng: 127.0469,
-    built: 2019, renovated: null,
-    aboveFloors: 18, belowFloors: 3,
-    area: 12100, occupancy: 49.0,
-    baseLease: 145, baseNet: 95, noc: 160000,
-    exclusive: false, parking: '혼용',
-    vacancies: [
-      { floor: '10층', area: 200, net: 140, noc: 160000, when: '2026-05' },
-    ]
+    elevators: { passenger: 4, emergency: 1, total: 5 },
+    parkingDetail: { total: 275, self: 211, mechanical: 64 },
+    parkingFree: '1대 / 50평',
+    parkingPaid: '월 22만원 / 대 (VAT포함)',
+    heating: '냉/난방 유형 선택',
+    notes: '-',
+    locationInfo: '2호선, 신분당선 강남역 도보 1분',
+    contacts: [
+      { name: '김민희', role: '과장/LM본부/GenstarMate', phone: '010-2079-7053', phone2: '02-3775-7226', email: 'mh.kim@genstarmate.com' },
+      { name: '장한덕', role: '본부장/LM본부/젠스타메이트', phone: '010-2240-2321', phone2: '02-3775-7220', email: 'hdjang@genstarmate.com' },
+      { name: '박환웅', role: '이사/LM본부/젠스타메이트', phone: '010-9238-7475', phone2: '02-2003-8013', email: 'hwpark@genstarmate.com' },
+    ],
+    baseStandard: { deposit: 1460000, rent: 146000, mgmt: 46000, noc: 329630, netArea: 253.71, leaseArea: 504.77, occupancyRate: 50.26, rf: 2, fo: 1, ti: null },
+    vacancies: [],
+    memos: [],
   },
 ];
 
@@ -238,9 +344,9 @@ const NAV_SECTIONS = [
 
 /* ===== 필터 (요구사항 8 - 그대로 유지) ===== */
 const FILTER_DEFS = [
-  { key: 'totalArea',     label: '총 임차 가능면적',          unit: '평',    type: 'range' },
-  { key: 'baseFloorArea', label: '건축물대장 기준층 면적',   unit: '평',    type: 'range' },
-  { key: 'netArea',       label: '전용 면적',                  unit: '평',    type: 'range' },
+  { key: 'totalArea',     label: '전체 공실 전용',             unit: '평',    type: 'range' },
+  { key: 'baseFloorArea', label: '층 공실 전용',               unit: '평',    type: 'range' },
+  { key: 'netArea',       label: '기준층 전용',                unit: '평',    type: 'range' },
   { key: 'monthlyFee',    label: '월 고정비',                  unit: '원/평', type: 'range' },
   { key: 'deposit',       label: '보증금',                     unit: '원/평', type: 'range' },
   { key: 'noc',           label: 'NOC',                        unit: '',      type: 'range' },
@@ -300,6 +406,9 @@ function GenstarMate() {
   const [photoIdx, setPhotoIdx]           = useState(0);
   const [cart, setCart]                   = useState([]);
   const [cartOpen, setCartOpen]           = useState(false);
+  const [detailOpen, setDetailOpen]       = useState(true);
+  const [compareOpen, setCompareOpen]     = useState(false);
+  const [pageView, setPageView]           = useState('map'); // 'map' | 'detail'
 
   const resetFilters = () => {
     setFilters(INITIAL_FILTERS);
@@ -308,8 +417,75 @@ function GenstarMate() {
   };
 
   const visibleBuildings = useMemo(
-    () => BUILDINGS.filter(b => activeRegions.includes(b.region)),
-    [activeRegions]
+    () => BUILDINGS.filter(b => {
+      // 권역
+      if (!activeRegions.includes(b.region)) return false;
+
+      // 총 공실 전용 (평) — 모든 공실의 전용면적 합산
+      const ta = filters.totalArea;
+      const totalVacNet = b.vacancies.reduce((s, v) => s + (v.net || 0), 0);
+      if (ta.min !== '' && +ta.min > 0 && totalVacNet < +ta.min) return false;
+      if (ta.max !== '' && +ta.max > 0 && totalVacNet > +ta.max) return false;
+
+      // 층 공실 전용 (평) — 개별 층 공실 전용면적 중 하나라도 범위 안에 들면 통과
+      const bfa = filters.baseFloorArea;
+      if (bfa.min !== '' && +bfa.min > 0 && !b.vacancies.some(v => (v.net || 0) >= +bfa.min)) return false;
+      if (bfa.max !== '' && +bfa.max > 0 && !b.vacancies.some(v => (v.net || 0) <= +bfa.max)) return false;
+
+      // 기준층 전용 (평)
+      const na = filters.netArea;
+      if (na.min !== '' && +na.min > 0 && b.baseNet < +na.min) return false;
+      if (na.max !== '' && +na.max > 0 && b.baseNet > +na.max) return false;
+
+      // 월 고정비 (원/평) — NOC 사용
+      const mf = filters.monthlyFee;
+      if (mf.min !== '' && +mf.min > 0 && b.noc < +mf.min) return false;
+      if (mf.max !== '' && +mf.max > 0 && b.noc > +mf.max) return false;
+
+      // 보증금 (원/평) — 통상 월 임대료의 10배
+      const dp = filters.deposit;
+      const depositVal = b.noc * 10;
+      if (dp.min !== '' && +dp.min > 0 && depositVal < +dp.min) return false;
+      if (dp.max !== '' && +dp.max > 0 && depositVal > +dp.max) return false;
+
+      // NOC — 공실 현황의 NOC 값 기준 (NOC 값이 없는 빌딩은 필터 무관하게 항상 통과)
+      const nc = filters.noc;
+      const hasAnyNoc = b.vacancies.some(v => v.noc && v.noc > 0);
+      if (hasAnyNoc) {
+        if (nc.min !== '' && +nc.min > 0 && !b.vacancies.some(v => v.noc && v.noc >= +nc.min)) return false;
+        if (nc.max !== '' && +nc.max > 0 && !b.vacancies.some(v => v.noc && v.noc <= +nc.max)) return false;
+      }
+
+      // 전속 Y/N
+      if (filters.exclusive === 'Y' && !b.exclusive) return false;
+      if (filters.exclusive === 'N' && b.exclusive) return false;
+
+      // 층수 (공실 층 기준)
+      if (filters.floors.length > 0) {
+        const hasMatch = b.vacancies.some(v => {
+          const f = v.floor;
+          const isB1 = f.includes('지하');
+          const is1F = /^1층|^1F\b/.test(f);
+          const isOver1 = !isB1 && !is1F;
+          if (filters.floors.includes('1층') && is1F) return true;
+          if (filters.floors.includes('지하층') && isB1) return true;
+          if (filters.floors.includes('지상층(1층 제외)') && isOver1) return true;
+          return false;
+        });
+        if (!hasMatch) return false;
+      }
+
+      // 공실 Y/N
+      const hasVacancy = b.vacancies.length > 0;
+      if (filters.vacancy === 'Y' && !hasVacancy) return false;
+      if (filters.vacancy === 'N' && hasVacancy) return false;
+
+      // 주차
+      if (filters.parking.length > 0 && !filters.parking.includes(b.parking)) return false;
+
+      return true;
+    }),
+    [activeRegions, filters]
   );
 
   const selected = BUILDINGS.find(b => b.id === selectedId) || BUILDINGS[0];
@@ -349,33 +525,68 @@ function GenstarMate() {
 
   return (
     <div className="h-screen flex bg-slate-50 text-slate-800 overflow-hidden text-[13px]">
-      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
+        currentPage={pageView} onNavigate={setPageView} />
       <div className="flex-1 flex flex-col min-w-0">
-        <FilterBar filters={filters} setFilters={setFilters}
-          openFilterKey={openFilterKey} setOpenFilterKey={setOpenFilterKey}
-          hasFilterValue={hasFilterValue}
-          activeRegions={activeRegions} setActiveRegions={setActiveRegions}
-          resetFilters={resetFilters}
-          cartCount={cart.length} onCartClick={() => setCartOpen(true)} />
-        <main className="flex-1 flex overflow-hidden min-h-0">
-          <div className="relative bg-slate-100 min-w-0" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
-            <KakaoMap
-              buildings={visibleBuildings}
-              selectedId={selectedId}
-              onMarkerClick={handleSelectBuilding} />
-            <MapLegend />
-            <MapStats count={visibleBuildings.length} regionCount={activeRegions.length} />
-          </div>
-          <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
-            onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart} />
-          <CompactList buildings={visibleBuildings} selectedId={selectedId}
-            onSelect={handleSelectBuilding} />
-        </main>
+        {pageView !== 'detail' && (
+          <FilterBar filters={filters} setFilters={setFilters}
+            openFilterKey={openFilterKey} setOpenFilterKey={setOpenFilterKey}
+            hasFilterValue={hasFilterValue}
+            activeRegions={activeRegions} setActiveRegions={setActiveRegions}
+            resetFilters={resetFilters}
+            cartCount={cart.length} onCartClick={() => setCartOpen(true)}
+            pageView={pageView} />
+        )}
+        {pageView === 'map' ? (
+          <main className="flex-1 flex overflow-hidden min-h-0">
+            <div className="relative bg-slate-100 min-w-0" style={{ height: '100%', flex: 1, overflow: 'hidden' }}>
+              <KakaoMap
+                buildings={visibleBuildings}
+                selectedId={selectedId}
+                onMarkerClick={handleSelectBuilding} />
+              <MapLegend />
+              <MapStats count={visibleBuildings.length} regionCount={activeRegions.length} />
+            </div>
+            {detailOpen ? (
+              <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
+                onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart}
+                onCollapse={() => setDetailOpen(false)}
+                onOpenDetail={() => setPageView('detail')} />
+            ) : (
+              <button onClick={() => setDetailOpen(true)}
+                className="w-8 bg-white border-l border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition flex-shrink-0 group">
+                <PanelLeftOpen size={14} className="text-slate-400 group-hover:text-indigo-600" />
+                <div className="text-[10px] font-semibold text-slate-500 group-hover:text-indigo-600" style={{writingMode:'vertical-rl'}}>상세 패널 펼치기</div>
+              </button>
+            )}
+            <CompactList buildings={visibleBuildings} selectedId={selectedId}
+              onSelect={handleSelectBuilding}
+              onOpenDetail={(id) => { setSelectedId(id); setPageView('detail'); }} />
+          </main>
+        ) : pageView === 'detail' ? (
+          <BuildingDetailPage building={selected}
+            onBack={() => setPageView('map')}
+            onAddVacancy={addToCart}
+            onAddAllVacancies={addAllVacancies}
+            cart={cart} />
+        ) : (
+          <AllBuildingsPage buildings={visibleBuildings} filters={filters}
+            onOpenDetail={(id) => { setSelectedId(id); setPageView('detail'); }}
+            onAddVacancy={addToCart}
+            cart={cart} />
+        )}
       </div>
 
       {cartOpen && (
         <CartDrawer cart={cart} onClose={() => setCartOpen(false)}
-          onRemove={removeFromCart} onClear={clearCart} />
+          onRemove={removeFromCart} onClear={clearCart}
+          onCompare={() => { setCartOpen(false); setCompareOpen(true); }} />
+      )}
+
+      {compareOpen && (
+        <CompareView cart={cart} buildings={BUILDINGS}
+          onClose={() => setCompareOpen(false)}
+          onRemove={removeFromCart} />
       )}
     </div>
   );
@@ -384,7 +595,12 @@ function GenstarMate() {
 /* ============================================================
  * Sidebar (요구사항 2)
  * ============================================================ */
-function Sidebar({ open, onToggle }) {
+function Sidebar({ open, onToggle, currentPage, onNavigate }) {
+  // child label → pageView 매핑
+  const CHILD_TO_PAGE = { '지도': 'map', '전체 빌딩': 'allBuildings' };
+  const PAGE_TO_CHILD = { 'map': '지도', 'detail': '지도', 'allBuildings': '전체 빌딩' };
+  const activeChild = PAGE_TO_CHILD[currentPage] || '지도';
+
   const initialExpanded = useMemo(() => {
     const exp = {};
     NAV_SECTIONS.forEach(section => {
@@ -431,11 +647,17 @@ function Sidebar({ open, onToggle }) {
                   </div>
                   {open && hasChildren && isExpanded && (
                     <div className="ml-6 mb-1">
-                      {item.children.map(child => (
-                        <div key={child} className={`px-3 py-1 text-[11px] cursor-pointer transition ${item.activeChild === child ? 'text-indigo-300 font-semibold border-l-2 border-indigo-400 pl-2.5' : 'text-slate-400 hover:text-slate-200'}`}>
-                          {child}
-                        </div>
-                      ))}
+                      {item.children.map(child => {
+                        const isActive = activeChild === child;
+                        const pageKey = CHILD_TO_PAGE[child];
+                        return (
+                          <div key={child}
+                            onClick={() => pageKey && onNavigate && onNavigate(pageKey)}
+                            className={`px-3 py-1 text-[11px] cursor-pointer transition ${isActive ? 'text-indigo-300 font-semibold border-l-2 border-indigo-400 pl-2.5' : 'text-slate-400 hover:text-slate-200'}`}>
+                            {child}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -612,8 +834,8 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       if (!container) return;
 
       const options = {
-        center: new window.kakao.maps.LatLng(37.5665, 126.9780),
-        level: 5,
+        center: new window.kakao.maps.LatLng(37.5400, 127.0500),
+        level: 8,   // 고정 축적 (1=가장확대 ~ 14=가장축소)
       };
       const map = new window.kakao.maps.Map(container, options);
       mapRef.current = map;
@@ -622,7 +844,7 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
         if (!mapRef.current) return;
         mapRef.current.relayout();
 
-        // ===== 지오코딩: 모든 빌딩 주소를 좌표로 변환 =====
+        // ===== 지오코딩: 모든 빌딩 주소를 좌표로 변환 (축적은 그대로 유지) =====
         if (window.kakao.maps.services && window.kakao.maps.services.Geocoder) {
           const geocoder = new window.kakao.maps.services.Geocoder();
           setGeoStatus({ done: 0, total: BUILDINGS.length, failed: [] });
@@ -643,11 +865,6 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
               setGeoStatus({ done, total: BUILDINGS.length, failed: [...failed] });
             });
           });
-        } else {
-          // 지오코더 사용 불가 시 수동 좌표로 fallback
-          const bounds = new window.kakao.maps.LatLngBounds();
-          BUILDINGS.forEach(b => bounds.extend(new window.kakao.maps.LatLng(b.lat, b.lng)));
-          mapRef.current.setBounds(bounds);
         }
       }, 100);
 
@@ -656,17 +873,8 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 지오코딩이 모두 끝나면 한 번 bounds 재조정
-  useEffect(() => {
-    if (!mapReady || !mapRef.current) return;
-    if (geoStatus.total === 0 || geoStatus.done < geoStatus.total) return;
-    const bounds = new window.kakao.maps.LatLngBounds();
-    BUILDINGS.forEach(b => {
-      const p = geocoded[b.id] || { lat: b.lat, lng: b.lng };
-      bounds.extend(new window.kakao.maps.LatLng(p.lat, p.lng));
-    });
-    mapRef.current.setBounds(bounds);
-  }, [mapReady, geoStatus.done, geoStatus.total]);
+  // 지오코딩 완료 시 setBounds 호출하지 않음 — 초기 축적 유지
+  // (사용자 요청: 지도 처음 구현할때 축적도 고정)
 
   // 마커 업데이트 (buildings/selectedId/지오코딩 변경 시)
   useEffect(() => {
@@ -686,7 +894,7 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       div.style.cursor = 'pointer';
       div.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;transform:translate(0,-100%);">
-          <div style="background:${isSelected ? color : '#1E293B'};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);margin-bottom:2px;${isSelected ? 'transform:scale(1.08);' : ''}">
+          <div style="background:${color};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);margin-bottom:2px;${isSelected ? 'transform:scale(1.12);outline:2px solid white;outline-offset:2px;' : ''}">
             ${b.name}
           </div>
           <svg width="${isSelected ? 28 : 22}" height="${isSelected ? 38 : 30}" viewBox="0 0 20 28" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.35));">
@@ -779,7 +987,7 @@ function MapStats({ count, regionCount }) {
 /* ============================================================
  * DetailCard
  * ============================================================ */
-function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVacancies, cart }) {
+function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVacancies, cart, onCollapse, onOpenDetail }) {
   const color = REGION_COLORS[building.region];
   const photoSlots = ['외관 사진', '내부 사진 1', '내부 사진 2', '내부 사진 3'];
 
@@ -791,11 +999,18 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
 
   return (
     <section className="w-[280px] bg-white border-l border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-slate-200 text-center flex-shrink-0">
-        <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">빌딩 이름</div>
-        <h2 className="font-bold text-[14px] text-slate-900 tracking-tight truncate" title={building.name}>{building.name}</h2>
-        <div className="text-[9px] text-slate-500 mt-0.5 truncate" title={building.address}>
-          <MapPin size={8} className="inline mr-0.5" />{building.address}
+      <div className="px-3 py-2.5 border-b border-slate-200 flex-shrink-0 relative">
+        <button onClick={onCollapse}
+          className="absolute top-2 right-2 p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+          title="패널 접기">
+          <PanelLeftClose size={13} />
+        </button>
+        <div className="text-center pr-6">
+          <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-0.5">빌딩 이름</div>
+          <h2 className="font-bold text-[14px] text-slate-900 tracking-tight truncate" title={building.name}>{building.name}</h2>
+          <div className="text-[9px] text-slate-500 mt-0.5 truncate" title={building.address}>
+            <MapPin size={8} className="inline mr-0.5" />{building.address}
+          </div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -837,60 +1052,70 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
           <KV label="전용률" value={`${building.occupancy}%`} />
         </div>
         <div className="grid grid-cols-2 border-b border-slate-100">
-          <KV label="기준 임대(평)" value={building.baseLease} border />
-          <KV label="기준 전용(평)" value={building.baseNet} />
+          <KV label="기준층 임대(평)" value={building.baseLease} border />
+          <KV label="기준층 전용(평)" value={building.baseNet} />
         </div>
         <div className="grid grid-cols-2 border-b border-slate-100">
-          <KV label="NOC" value={building.noc.toLocaleString()} border />
-          <KV label="주차" value={building.parking} />
+          <KV label="주차" value={building.parking} border />
+          <KV label="" value="" />
         </div>
 
         <div className="px-3 py-2.5 border-b border-slate-100">
           <div className="text-[10px] font-bold text-slate-700 mb-1.5">공실 현황</div>
-          <div className="grid grid-cols-12 gap-0 text-[8px] font-semibold text-slate-500 uppercase mb-1 pb-1 border-b border-slate-200">
-            <div className="col-span-2">층</div>
-            <div className="col-span-2 text-right">임대</div>
-            <div className="col-span-2 text-right">전용</div>
-            <div className="col-span-1 text-right">NOC</div>
-            <div className="col-span-3 pl-2">입주 시기</div>
-            <div className="col-span-2 text-right">담기</div>
-          </div>
-          {building.vacancies.map((v, i) => {
-            const inCart = isInCart(v);
-            return (
-              <div key={i} className="grid grid-cols-12 gap-0 text-[9px] py-1 border-b last:border-b-0 border-slate-50 items-center">
-                <div className="col-span-2 font-bold">{v.floor}</div>
-                <div className="col-span-2 text-right">{v.area}</div>
-                <div className="col-span-2 text-right">{v.net}</div>
-                <div className="col-span-1 text-right">{v.noc > 0 ? (v.noc/1000).toFixed(0) + 'k' : '-'}</div>
-                <div className="col-span-3 pl-2 text-slate-600 truncate">{v.when}</div>
-                <div className="col-span-2 text-right">
-                  <button onClick={() => onAddVacancy(building, v)} disabled={inCart}
-                    className={`text-[8px] font-bold ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
-                    {inCart ? '담김' : '+ 담기'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="grid grid-cols-12 gap-0 text-[9px] py-1.5 mt-1 bg-slate-50 -mx-3 px-3 items-center font-semibold">
-            <div className="col-span-2 font-bold text-slate-800">총 공실</div>
-            <div className="col-span-2 text-right">{totalArea.toFixed(0)}</div>
-            <div className="col-span-2 text-right">{totalNet.toFixed(0)}</div>
-            <div className="col-span-1 text-right">{avgNoc > 0 ? (avgNoc/1000).toFixed(0) + 'k' : '-'}</div>
-            <div className="col-span-5 text-right">
-              <button onClick={() => onAddAllVacancies(building)}
-                className="px-2.5 py-1 text-[9px] font-bold text-white rounded transition hover:opacity-90"
-                style={{ backgroundColor: color.bg }}>
-                전체 담기
-              </button>
-            </div>
+          <div className="rounded-md border border-slate-200 overflow-hidden">
+            <table className="w-full text-[10px] tabular-nums">
+              <thead className="bg-slate-50">
+                <tr className="text-slate-500 font-semibold">
+                  <th className="text-left px-1.5 py-1.5 w-9">층</th>
+                  <th className="text-right px-1 py-1.5">임대</th>
+                  <th className="text-right px-1 py-1.5">전용</th>
+                  <th className="text-right px-1 py-1.5">NOC</th>
+                  <th className="text-left px-1.5 py-1.5">입주</th>
+                  <th className="text-right px-1.5 py-1.5 w-10">담기</th>
+                </tr>
+              </thead>
+              <tbody>
+                {building.vacancies.map((v, i) => {
+                  const inCart = isInCart(v);
+                  return (
+                    <tr key={i} className="border-t border-slate-100 hover:bg-slate-50/50">
+                      <td className="px-1.5 py-1.5 font-bold text-slate-800">{v.floor}</td>
+                      <td className="text-right px-1 py-1.5 text-slate-700 font-medium">{v.area}</td>
+                      <td className="text-right px-1 py-1.5 text-slate-500">{v.net}</td>
+                      <td className="text-right px-1 py-1.5 text-slate-700 font-medium">{v.noc > 0 ? v.noc.toLocaleString() : '-'}</td>
+                      <td className="px-1.5 py-1.5 text-slate-600 truncate">{v.when}</td>
+                      <td className="text-right px-1.5 py-1.5">
+                        <button onClick={() => onAddVacancy(building, v)} disabled={inCart}
+                          className={`text-[9px] font-bold whitespace-nowrap ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                          {inCart ? '담김' : '+ 담기'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 border-t border-slate-200 font-semibold">
+                  <td className="px-1.5 py-1.5 font-bold text-slate-800">총공실</td>
+                  <td className="text-right px-1 py-1.5 text-slate-900">{totalArea.toFixed(0)}</td>
+                  <td className="text-right px-1 py-1.5 text-slate-700">{totalNet.toFixed(0)}</td>
+                  <td className="text-right px-1 py-1.5 text-slate-700">{avgNoc > 0 ? avgNoc.toLocaleString() : '-'}</td>
+                  <td colSpan="2" className="text-right px-1.5 py-1.5">
+                    <button onClick={() => onAddAllVacancies(building)}
+                      className="px-2 py-0.5 text-[9px] font-bold text-white rounded transition hover:opacity-90 whitespace-nowrap"
+                      style={{ backgroundColor: color.bg }}>
+                      전체 담기
+                    </button>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       </div>
       <div className="px-3 py-2.5 border-t border-slate-200 flex-shrink-0">
-        <button className="w-full py-2 text-[11px] font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition flex items-center justify-center gap-1.5"
+        <button onClick={onOpenDetail}
+          className="w-full py-2 text-[11px] font-bold text-white rounded-lg shadow-sm hover:opacity-90 transition flex items-center justify-center gap-1.5"
           style={{ backgroundColor: color.bg }}>
           건물 상세보기 <ChevronRight size={12} />
         </button>
@@ -911,7 +1136,7 @@ function KV({ label, value, border }) {
 /* ============================================================
  * CompactList
  * ============================================================ */
-function CompactList({ buildings, selectedId, onSelect }) {
+function CompactList({ buildings, selectedId, onSelect, onOpenDetail }) {
   return (
     <aside className="w-[220px] bg-slate-50 border-l border-slate-200 flex flex-col flex-shrink-0">
       <div className="px-3 py-2.5 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0">
@@ -920,14 +1145,16 @@ function CompactList({ buildings, selectedId, onSelect }) {
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {buildings.map(b => (
-          <CompactItem key={b.id} building={b} selected={selectedId === b.id} onSelect={() => onSelect(b.id)} />
+          <CompactItem key={b.id} building={b} selected={selectedId === b.id}
+            onSelect={() => onSelect(b.id)}
+            onOpenDetail={() => onOpenDetail(b.id)} />
         ))}
       </div>
     </aside>
   );
 }
 
-function CompactItem({ building, selected, onSelect }) {
+function CompactItem({ building, selected, onSelect, onOpenDetail }) {
   const color = REGION_COLORS[building.region];
   return (
     <div onClick={onSelect}
@@ -951,7 +1178,7 @@ function CompactItem({ building, selected, onSelect }) {
       <div className="grid grid-cols-2 gap-px bg-slate-100">
         <button onClick={(e) => { e.stopPropagation(); onSelect(); }}
           className="py-1.5 text-[10px] font-bold bg-white text-slate-700 hover:bg-slate-50">요약 이동</button>
-        <button onClick={(e) => e.stopPropagation()}
+        <button onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
           className="py-1.5 text-[10px] font-bold text-white hover:opacity-90"
           style={{ backgroundColor: color.bg }}>상세 이동</button>
       </div>
@@ -962,7 +1189,7 @@ function CompactItem({ building, selected, onSelect }) {
 /* ============================================================
  * CartDrawer (요구사항 1)
  * ============================================================ */
-function CartDrawer({ cart, onClose, onRemove, onClear }) {
+function CartDrawer({ cart, onClose, onRemove, onClear, onCompare }) {
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
@@ -1018,7 +1245,7 @@ function CartDrawer({ cart, onClose, onRemove, onClear }) {
                       </div>
                       <div>
                         <div className="text-[8px] text-slate-500">NOC</div>
-                        <div className="text-[10px] font-bold">{item.noc > 0 ? (item.noc/1000).toFixed(0)+'k' : '-'}</div>
+                        <div className="text-[10px] font-bold tabular-nums">{item.noc > 0 ? item.noc.toLocaleString() : '-'}</div>
                       </div>
                       <div>
                         <div className="text-[8px] text-slate-500">입주</div>
@@ -1035,13 +1262,891 @@ function CartDrawer({ cart, onClose, onRemove, onClear }) {
           <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0">
             <button onClick={onClear}
               className="text-[11px] text-slate-500 hover:text-rose-600">전체 비우기</button>
-            <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-              매물 리스트 작성 ({cart.length})
+            <button onClick={onCompare}
+              className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center gap-1">
+              비교표 보기 ({cart.length}) <ChevronRight size={11} />
             </button>
           </div>
         )}
       </div>
     </>
+  );
+}
+
+/* ============================================================
+ * CompareView - 매물 비교표 (엑셀 템플릿과 동일 구조)
+ * ============================================================ */
+function CompareView({ cart, buildings, onClose, onRemove }) {
+  // 카트를 빌딩별로 그룹화
+  const groups = useMemo(() => {
+    const map = {};
+    cart.forEach(item => {
+      if (!map[item.buildingId]) {
+        const b = buildings.find(x => x.id === item.buildingId);
+        map[item.buildingId] = { building: b, items: [] };
+      }
+      map[item.buildingId].items.push(item);
+    });
+    return Object.values(map);
+  }, [cart, buildings]);
+
+  // 편집 가능 셀 상태 (groupId-field 키)
+  const [edits, setEdits] = useState({});
+  const editKey = (gid, field) => `${gid}-${field}`;
+  const getEdit = (gid, field, defaultVal) => {
+    const k = editKey(gid, field);
+    return edits[k] !== undefined ? edits[k] : defaultVal;
+  };
+  const setEdit = (gid, field, val) => setEdits(prev => ({ ...prev, [editKey(gid, field)]: val }));
+
+  const [presentTo, setPresentTo] = useState('그레이츠 강남');
+
+  // 컬럼별 계산값
+  const computeCol = (g) => {
+    const b = g.building;
+    const items = g.items;
+    const vacAreaSum = items.reduce((s,i) => s+(+i.area||0), 0);
+    const vacNetSum  = items.reduce((s,i) => s+(+i.net||0), 0);
+    const floors     = items.map(i => i.floor).join(', ');
+
+    const propArea = +getEdit(b.id, 'propArea', vacAreaSum.toFixed(2));
+    const propNet  = +getEdit(b.id, 'propNet',  vacNetSum.toFixed(2));
+    const propFloors = getEdit(b.id, 'propFloors', floors);
+
+    // 임대료/관리비/보증금 (NOC에서 분해 — 78/22 비율 가정, 보증금=임대료×10)
+    const rentPerPy   = Math.round(b.noc * 0.78);
+    const mgmtPerPy   = Math.round(b.noc * 0.22);
+    const depositPerPy = rentPerPy * 10;
+
+    const rf       = +getEdit(b.id, 'rf', 0)       || 0;
+    const fitOut   = +getEdit(b.id, 'fitOut', 0)   || 0;
+    const ti       = +getEdit(b.id, 'ti', 0)       || 0;
+
+    const monthlyRent = propArea * rentPerPy;
+    const monthlyMgmt = propArea * mgmtPerPy;
+    const occMonths   = 60 + fitOut;
+    const tiToRfMonths = monthlyRent > 0 ? ti / monthlyRent : 0;
+    const totalRfMonths = rf + fitOut + tiToRfMonths;
+    const monthlyRentAfterRf = occMonths > 0 ? monthlyRent * (occMonths - totalRfMonths) / occMonths : 0;
+    const monthlyTotalAfter = monthlyRentAfterRf + monthlyMgmt;
+    const eNoc = propNet > 0 ? monthlyTotalAfter / propNet : 0;
+
+    return {
+      b, items,
+      vacAreaSum, vacNetSum,
+      propArea, propNet, propFloors,
+      rentPerPy, mgmtPerPy, depositPerPy,
+      rf, fitOut, ti,
+      monthlyRent, monthlyMgmt,
+      occMonths, tiToRfMonths, totalRfMonths,
+      monthlyRentAfterRf, monthlyTotalAfter, eNoc,
+    };
+  };
+
+  const cols = groups.map(computeCol);
+
+  const fmt = (n, dec = 0) => {
+    if (!isFinite(n)) return '-';
+    return Math.round(n * Math.pow(10, dec)) / Math.pow(10, dec);
+  };
+  const fmtKR = (n) => {
+    if (!isFinite(n) || n === 0) return '0';
+    return Math.round(n).toLocaleString();
+  };
+
+  // 엑셀 다운로드
+  const downloadExcel = () => {
+    if (!window.XLSX) { alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+
+    // AOA(Array of Arrays) 방식으로 엑셀 시트 구성
+    const rows = [];
+    const N = cols.length;
+    const blank = Array(N).fill('');
+
+    // 빌딩명 헤더 컬럼
+    const colHeaders = cols.map(c => c.b.name);
+
+    rows.push(['PRESENT TO :', '', presentTo, ...Array(N-1).fill('')]);
+    rows.push(['', '', '', ...Array(N-1).fill('')]);
+    rows.push(['', '빌딩명', ...colHeaders]);
+    rows.push(['자산개요', '도로명 주소',          ...cols.map(c => c.b.address)]);
+    rows.push(['',         '준공년도 / 리모델링', ...cols.map(c => c.b.renovated ? `${c.b.built} / ${c.b.renovated}` : `${c.b.built}`)]);
+    rows.push(['',         '빌딩 규모',           ...cols.map(c => `B${c.b.belowFloors}/${c.b.aboveFloors}F`)]);
+    rows.push(['',         '연면적 (평)',          ...cols.map(c => c.b.area)]);
+    rows.push(['',         '전용률 (%)',           ...cols.map(c => `${c.b.occupancy}%`)]);
+    rows.push(['',         '기준층 임대면적 (평)', ...cols.map(c => c.b.baseLease)]);
+    rows.push(['',         '기준층 전용면적 (평)', ...cols.map(c => c.b.baseNet)]);
+    rows.push(['', '', ...blank]);
+    rows.push(['주차', '주차 방식',         ...cols.map(c => c.b.parking)]);
+    rows.push(['',     '총 주차 대수',      ...cols.map(c => Math.round(c.b.area * 0.012) + '대')]);
+    rows.push(['',     '무료 주차 비율',    ...cols.map(_ => '1대/70평')]);
+    rows.push(['', '', ...blank]);
+    rows.push(['공실면적', '임대면적 합계 (평)', ...cols.map(c => c.vacAreaSum)]);
+    rows.push(['',         '전용면적 합계 (평)', ...cols.map(c => c.vacNetSum)]);
+    rows.push(['', '', ...blank]);
+    rows.push(['제안면적 ✏️', '임대면적 (평) ✏️', ...cols.map(c => c.propArea)]);
+    rows.push(['',            '전용면적 (평) ✏️', ...cols.map(c => c.propNet)]);
+    rows.push(['',            '제안층 ✏️',         ...cols.map(c => c.propFloors)]);
+    rows.push(['', '', ...blank]);
+    rows.push(['기준단가 (평)', '보증금', ...cols.map(c => c.depositPerPy)]);
+    rows.push(['',             '임대료', ...cols.map(c => c.rentPerPy)]);
+    rows.push(['',             '관리비', ...cols.map(c => c.mgmtPerPy)]);
+    rows.push(['', '', ...blank]);
+    rows.push(['임대조건 ✏️', 'Rent Free (개월) ✏️', ...cols.map(c => c.rf)]);
+    rows.push(['',            'Fit-Out (개월) ✏️',   ...cols.map(c => c.fitOut)]);
+    rows.push(['',            'T.I (인테리어 현금지원, 원) ✏️', ...cols.map(c => c.ti)]);
+    rows.push(['', '', ...blank]);
+    rows.push(['자동계산', '월 임대료 (RF 전)',      ...cols.map(c => Math.round(c.monthlyRent))]);
+    rows.push(['',         '월 관리비',               ...cols.map(c => Math.round(c.monthlyMgmt))]);
+    rows.push(['',         '점유기간 (개월)',         ...cols.map(c => c.occMonths)]);
+    rows.push(['',         'TI → RF 환산 (개월)',     ...cols.map(c => +c.tiToRfMonths.toFixed(2))]);
+    rows.push(['',         '총 RF 환산 (개월)',       ...cols.map(c => +c.totalRfMonths.toFixed(2))]);
+    rows.push(['',         '월 임대료 (RF 반영 후)',  ...cols.map(c => Math.round(c.monthlyRentAfterRf))]);
+    rows.push(['',         '월 임관리비 합계',         ...cols.map(c => Math.round(c.monthlyTotalAfter))]);
+    rows.push(['E.NOC', 'E.NOC (점유기간 기준, 원/평/월)', ...cols.map(c => Math.round(c.eNoc))]);
+    rows.push(['', '', ...blank]);
+    rows.push(['컨택포인트', '담당자 / 연락처', ...Array(N).fill('장한덕 본부장  010-2240-2321\n박환웅 이사  010-9238-7475')]);
+    rows.push(['', '', ...blank]);
+    rows.push(['공실 상세 (선택층)', '층 / 임대면적 / 전용면적 / 입주시기',
+      ...cols.map(c => c.items.map(i => `[${i.floor}] 임대:${i.area}평 / 전용:${i.net}평 / ${i.when}`).join('\n'))
+    ]);
+
+    const ws = window.XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch: 13}, {wch: 26}, ...Array(N).fill({wch: 22})];
+
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, '빌딩 비교표');
+
+    const today = new Date();
+    const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+    window.XLSX.writeFile(wb, `GenstarMate_빌딩비교표_${ymd}.xlsx`);
+  };
+
+  if (cols.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="bg-white rounded-2xl p-8 max-w-md text-center" onClick={e => e.stopPropagation()}>
+          <ShoppingBag size={32} className="text-slate-300 mx-auto mb-2" />
+          <div className="font-bold text-slate-700 mb-1">담긴 매물이 없습니다</div>
+          <div className="text-[12px] text-slate-500 mb-4">먼저 카트에 매물을 담아주세요</div>
+          <button onClick={onClose} className="px-4 py-2 text-[12px] bg-slate-700 text-white rounded-md">닫기</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 z-50 flex flex-col">
+      <div className="bg-white px-5 py-3 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <FileText size={18} className="text-indigo-600" />
+          <h2 className="font-bold text-[15px] text-slate-900">매물 비교표</h2>
+          <span className="text-[10px] font-bold text-white bg-indigo-600 px-2 py-0.5 rounded-full">{cols.length}건</span>
+          <div className="flex items-center gap-1.5 ml-4 border-l border-slate-200 pl-4">
+            <span className="text-[11px] font-semibold text-slate-500">PRESENT TO:</span>
+            <input value={presentTo} onChange={e => setPresentTo(e.target.value)}
+              className="px-2 py-1 text-[12px] border border-slate-200 rounded font-semibold text-slate-800 w-44 focus:border-indigo-400 outline-none" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadExcel}
+            className="px-3 py-1.5 text-[12px] font-bold bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-1.5">
+            📊 엑셀 다운로드
+          </button>
+          <button onClick={onClose} className="p-2 rounded hover:bg-slate-100 text-slate-500">
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto bg-slate-100 p-5">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden inline-block min-w-full">
+          <table className="border-collapse text-[11px]">
+            <thead>
+              <tr>
+                <th className="bg-slate-700 text-white px-3 py-2 text-left font-bold sticky left-0 z-10" style={{width:120}}>구분</th>
+                <th className="bg-slate-700 text-white px-3 py-2 text-left font-bold sticky z-10" style={{width:200, left:120}}>항목</th>
+                {cols.map((c, i) => (
+                  <th key={i} className="bg-slate-800 text-white px-3 py-2 text-left font-bold border-l border-slate-600" style={{minWidth:220}}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1 py-px text-[8px] font-bold rounded" style={{backgroundColor: REGION_COLORS[c.b.region].light, color: REGION_COLORS[c.b.region].text}}>{REGION_COLORS[c.b.region].name}</span>
+                        <span>{c.b.name}</span>
+                      </div>
+                      <button onClick={() => c.items.forEach(i => onRemove(i.id))}
+                        className="text-slate-300 hover:text-rose-400" title="이 빌딩 제거">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <CompareSection title="자산개요" rows={[
+                ['도로명 주소',         cols.map(c => c.b.address)],
+                ['준공년도 / 리모델링', cols.map(c => c.b.renovated ? `${c.b.built} / ${c.b.renovated}` : c.b.built)],
+                ['빌딩 규모',           cols.map(c => `B${c.b.belowFloors}/${c.b.aboveFloors}F`)],
+                ['연면적 (평)',          cols.map(c => c.b.area.toLocaleString())],
+                ['전용률 (%)',           cols.map(c => `${c.b.occupancy}%`)],
+                ['기준층 임대면적 (평)', cols.map(c => c.b.baseLease)],
+                ['기준층 전용면적 (평)', cols.map(c => c.b.baseNet)],
+              ]} />
+
+              <CompareSection title="주차" rows={[
+                ['주차 방식',      cols.map(c => c.b.parking)],
+                ['총 주차 대수',   cols.map(c => Math.round(c.b.area * 0.012) + '대')],
+                ['무료 주차 비율', cols.map(_ => '1대/70평')],
+              ]} />
+
+              <CompareSection title="공실면적" rows={[
+                ['임대면적 합계 (평)', cols.map(c => c.vacAreaSum.toFixed(2))],
+                ['전용면적 합계 (평)', cols.map(c => c.vacNetSum.toFixed(2))],
+              ]} />
+
+              <CompareSection title="제안면적 ✏️" highlight rows={[
+                ['임대면적 (평) ✏️', cols.map((c,i) => <EditCell key={i} value={c.propArea} onChange={v => setEdit(c.b.id, 'propArea', v)} type="number" />)],
+                ['전용면적 (평) ✏️', cols.map((c,i) => <EditCell key={i} value={c.propNet}  onChange={v => setEdit(c.b.id, 'propNet', v)}  type="number" />)],
+                ['제안층 ✏️',         cols.map((c,i) => <EditCell key={i} value={c.propFloors} onChange={v => setEdit(c.b.id, 'propFloors', v)} />)],
+              ]} />
+
+              <CompareSection title="기준단가 (평)" rows={[
+                ['보증금', cols.map(c => fmtKR(c.depositPerPy))],
+                ['임대료', cols.map(c => fmtKR(c.rentPerPy))],
+                ['관리비', cols.map(c => fmtKR(c.mgmtPerPy))],
+              ]} />
+
+              <CompareSection title="임대조건 ✏️" highlight rows={[
+                ['Rent Free (개월) ✏️',          cols.map((c,i) => <EditCell key={i} value={c.rf}     onChange={v => setEdit(c.b.id, 'rf', v)} type="number" />)],
+                ['Fit-Out (개월) ✏️',            cols.map((c,i) => <EditCell key={i} value={c.fitOut} onChange={v => setEdit(c.b.id, 'fitOut', v)} type="number" />)],
+                ['T.I (인테리어 현금지원, 원) ✏️', cols.map((c,i) => <EditCell key={i} value={c.ti}     onChange={v => setEdit(c.b.id, 'ti', v)} type="number" />)],
+              ]} />
+
+              <CompareSection title="자동계산" calc rows={[
+                ['월 임대료 (RF 전)',     cols.map(c => fmtKR(c.monthlyRent))],
+                ['월 관리비',              cols.map(c => fmtKR(c.monthlyMgmt))],
+                ['점유기간 (개월)',         cols.map(c => c.occMonths)],
+                ['TI → RF 환산 (개월)',     cols.map(c => c.tiToRfMonths.toFixed(2))],
+                ['총 RF 환산 (개월)',       cols.map(c => c.totalRfMonths.toFixed(2))],
+                ['월 임대료 (RF 반영 후)',  cols.map(c => fmtKR(c.monthlyRentAfterRf))],
+                ['월 임관리비 합계',         cols.map(c => fmtKR(c.monthlyTotalAfter))],
+              ]} />
+
+              <tr>
+                <td className="bg-indigo-700 text-white px-3 py-3 font-bold sticky left-0 z-10" style={{width:120}}>E.NOC</td>
+                <td className="bg-indigo-700 text-white px-3 py-3 font-bold sticky z-10" style={{width:200, left:120}}>E.NOC (점유기간 기준, 원/평/월)</td>
+                {cols.map((c,i) => (
+                  <td key={i} className="bg-indigo-600 text-white px-3 py-3 font-bold text-right border-l border-indigo-500" style={{fontSize:13}}>
+                    {fmtKR(c.eNoc)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2 + cols.length} className="bg-amber-50 border-t border-amber-200 px-4 py-2 text-[11px] text-amber-800">
+                  ✏️ 노란색 셀은 직접 수정 가능 — 임대조건 입력 시 E.NOC 자동 재계산 / 🔵 회색 셀은 자동계산
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white px-5 py-2.5 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+        <div className="text-[11px] text-slate-500">
+          담당: 장한덕 본부장 · 박환웅 이사 · 김민희 과장
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded-md text-slate-700 hover:bg-slate-50">닫기</button>
+          <button onClick={downloadExcel} className="px-3 py-1.5 text-[11px] font-bold bg-green-600 text-white rounded-md hover:bg-green-700">엑셀로 저장</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompareSection({ title, rows, highlight, calc }) {
+  return (
+    <React.Fragment>
+      {rows.map((row, ri) => (
+        <tr key={ri} className={calc ? 'bg-slate-50' : ''}>
+          {ri === 0 && (
+            <td rowSpan={rows.length} className={`px-3 py-2 font-bold sticky left-0 z-10 align-top border-t border-slate-200 ${highlight ? 'bg-amber-50 text-amber-900' : calc ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-700'}`} style={{width:120}}>
+              {title}
+            </td>
+          )}
+          <td className="px-3 py-1.5 text-slate-600 border-t border-slate-100 sticky z-10 bg-white" style={{width:200, left:120}}>{row[0]}</td>
+          {row[1].map((cell, ci) => (
+            <td key={ci} className={`px-3 py-1.5 border-t border-slate-100 border-l border-slate-100 text-right tabular-nums ${calc ? 'bg-slate-50 text-slate-600' : 'text-slate-800'}`}>
+              {cell}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </React.Fragment>
+  );
+}
+
+function EditCell({ value, onChange, type='text' }) {
+  return (
+    <input type={type} value={value} onChange={e => onChange(e.target.value)}
+      className="w-full px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-right tabular-nums focus:border-amber-500 outline-none" />
+  );
+}
+
+/* ============================================================
+ * BuildingDetailPage - 빌딩 상세 페이지 (사진 + 정보 + 메모 + 공실)
+ * ============================================================ */
+function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies, cart }) {
+  if (!building) return null;
+  const color = REGION_COLORS[building.region];
+  const [memoInput, setMemoInput] = useState('');
+  const [localMemos, setLocalMemos] = useState(building.memos || []);
+  const [memoPage, setMemoPage] = useState(1);
+  const MEMO_PER_PAGE = 5;
+
+  useEffect(() => {
+    setLocalMemos(building.memos || []);
+    setMemoPage(1);
+    setMemoInput('');
+  }, [building.id]);
+
+  const addMemo = () => {
+    if (!memoInput.trim()) return;
+    const now = new Date();
+    const dt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    setLocalMemos(prev => [{ author: '장한덕 본부장', dt, text: memoInput }, ...prev]);
+    setMemoInput('');
+  };
+
+  const totalMemoPages = Math.max(1, Math.ceil(localMemos.length / MEMO_PER_PAGE));
+  const pagedMemos = localMemos.slice((memoPage-1)*MEMO_PER_PAGE, memoPage*MEMO_PER_PAGE);
+
+  return (
+    <div className="flex-1 overflow-auto bg-slate-100">
+      {/* Top action bar */}
+      <div className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 text-[12px] font-semibold transition">
+            <ChevronLeft size={14} /> 지도로 돌아가기
+          </button>
+          <div className="h-4 w-px bg-slate-200" />
+          <span className="px-2 py-0.5 text-[10px] font-bold rounded" style={{backgroundColor: color.light, color: color.text}}>{color.name}</span>
+          <h1 className="font-bold text-[16px] text-slate-900">{building.name}</h1>
+          {building.alias && <span className="text-[11px] text-slate-400">{building.alias}</span>}
+          {building.exclusive && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-700 rounded">전속</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">제안서 출력</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold text-white rounded" style={{backgroundColor: color.bg}}>저장</button>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* Top 3-column section */}
+        <div className="grid gap-4" style={{gridTemplateColumns: '380px minmax(420px,1fr) 420px'}}>
+          {/* LEFT: photo + basic info */}
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            <BuildingPhoto building={building} />
+            <BasicInfoForm building={building} />
+          </div>
+
+          {/* MIDDLE: 임대안내문 + 컨택포인트 */}
+          <div className="space-y-4">
+            <RentalInfoSection building={building} />
+            <ContactsSection building={building} />
+          </div>
+
+          {/* RIGHT: 메모 내역 */}
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col" style={{minHeight: 540}}>
+            <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+              <span className="text-[13px] font-bold text-slate-800">메모 내역</span>
+              <span className="text-[10px] text-slate-400 font-semibold">{localMemos.length}건</span>
+            </div>
+            <div className="p-3 border-b border-slate-100 flex gap-2">
+              <textarea value={memoInput} onChange={e => setMemoInput(e.target.value)}
+                placeholder="내용을 입력해 주세요."
+                className="flex-1 px-2.5 py-2 text-[12px] border border-slate-200 rounded resize-none focus:border-indigo-400 outline-none"
+                rows={2}/>
+              <button onClick={addMemo}
+                className="px-3 py-1.5 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900 self-stretch">
+                메모<br/>등록
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {localMemos.length === 0 ? (
+                <div className="text-center text-[12px] text-slate-400 py-10">메모가 없습니다</div>
+              ) : (
+                pagedMemos.map((m, i) => (
+                  <div key={i} className="px-3 py-2 border-b border-slate-100 hover:bg-slate-50">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-[11px] font-bold text-indigo-700">{m.author}</span>
+                      <span className="text-[10px] text-slate-400">{m.dt}</span>
+                    </div>
+                    <div className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-line">{m.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="px-3 py-2 border-t border-slate-200 flex items-center justify-center gap-1 text-[11px]">
+              <button onClick={() => setMemoPage(1)} disabled={memoPage === 1}
+                className="px-1.5 py-0.5 disabled:text-slate-300 hover:text-indigo-600">{'<<'}</button>
+              <button onClick={() => setMemoPage(p => Math.max(1, p-1))} disabled={memoPage === 1}
+                className="px-1.5 py-0.5 disabled:text-slate-300 hover:text-indigo-600">{'<'}</button>
+              {Array.from({length: Math.min(5, totalMemoPages)}).map((_, i) => {
+                const pg = i + 1;
+                return (
+                  <button key={pg} onClick={() => setMemoPage(pg)}
+                    className={`px-2 py-0.5 rounded ${memoPage===pg ? 'bg-slate-800 text-white font-bold' : 'text-slate-600 hover:bg-slate-100'}`}>{pg}</button>
+                );
+              })}
+              <button onClick={() => setMemoPage(p => Math.min(totalMemoPages, p+1))} disabled={memoPage === totalMemoPages}
+                className="px-1.5 py-0.5 disabled:text-slate-300 hover:text-indigo-600">{'>'}</button>
+              <button onClick={() => setMemoPage(totalMemoPages)} disabled={memoPage === totalMemoPages}
+                className="px-1.5 py-0.5 disabled:text-slate-300 hover:text-indigo-600">{'>>'}</button>
+            </div>
+          </div>
+        </div>
+
+        {/* 기준층 정보 (평단가) */}
+        <BaseStandardTable building={building} />
+
+        {/* 개별공실 정보 */}
+        <VacancyDetailTable building={building} onAddVacancy={onAddVacancy} onAddAllVacancies={onAddAllVacancies} cart={cart} />
+      </div>
+    </div>
+  );
+}
+
+/* ----- 빌딩 사진 ----- */
+function BuildingPhoto({ building }) {
+  const [imgError, setImgError] = useState(false);
+  const hasPhoto = building.photo && !imgError;
+  return (
+    <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center border-b border-slate-200">
+      {hasPhoto ? (
+        <img src={building.photo} alt={building.name}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)} />
+      ) : (
+        <div className="flex flex-col items-center gap-1.5 text-slate-400">
+          <ImageIcon size={30} />
+          <span className="text-[10px] font-semibold">이미지를 업로드해주세요</span>
+        </div>
+      )}
+      <button className="absolute top-2 right-2 p-1 bg-white/90 backdrop-blur rounded hover:bg-white">
+        <Sparkles size={12} className="text-amber-500" />
+      </button>
+    </div>
+  );
+}
+
+/* ----- 기본 정보 폼 ----- */
+function BasicInfoForm({ building: b }) {
+  const Row = ({ label, children, label2, children2 }) => (
+    <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+      <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
+      <div className="col-span-3 px-2.5 py-1.5 text-slate-800 border-r border-slate-100 flex items-center">{children}</div>
+      {label2 !== undefined && (<>
+        <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label2}</div>
+        <div className="col-span-3 px-2.5 py-1.5 text-slate-800 flex items-center">{children2}</div>
+      </>)}
+    </div>
+  );
+  return (
+    <div>
+      <div className="grid grid-cols-12 text-[11px]">
+        <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">빌딩명</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 font-bold">{b.name}{b.alias && <span className="text-slate-400 font-normal text-[10px] ml-1">({b.alias})</span>}</div>
+      </div>
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">주소</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">{b.address}</div>
+      </div>
+      <Row label="전속 유형" label2="LM 권역"
+        children={<span className="text-slate-500">{b.contractType || '전속 유형 선택'}</span>}
+        children2={<span className="font-bold" style={{color: REGION_COLORS[b.region].text}}>{REGION_COLORS[b.region].name}</span>} />
+      <Row label="준공년도" label2="리모델링"
+        children={<>{b.built} 년</>}
+        children2={b.renovated ? <>{b.renovated}</> : <span className="text-slate-300">-</span>} />
+      <Row label="지상층" label2="지하층"
+        children={<>{b.aboveFloors} F</>}
+        children2={<>{b.belowFloors} F</>} />
+      <Row label="연면적" label2="규모"
+        children={<>{b.area.toLocaleString()} 평</>}
+        children2={<span className="text-slate-500">{b.scale || '-'}</span>} />
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">전용률</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 text-right pr-3">{b.occupancy} %</div>
+      </div>
+      <Row label="승용 E/V" label2="비상용 E/V"
+        children={<>{b.elevators?.passenger ?? '-'} 대</>}
+        children2={<>{b.elevators?.emergency ?? '-'} 대</>} />
+      <Row label="총 주차 대수" label2="총 E/V"
+        children={<>{b.parkingDetail?.total ?? '-'} 대</>}
+        children2={<>{b.elevators?.total ?? '-'} 대</>} />
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">자주식 / 기계식 대수</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">기계식 {b.parkingDetail?.mechanical ?? 0} 대 / 자주식 {b.parkingDetail?.self ?? 0} 대</div>
+      </div>
+    </div>
+  );
+}
+
+/* ----- 임대안내문 부가 정보 ----- */
+function RentalInfoSection({ building: b }) {
+  const Row = ({ label, value }) => (
+    <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+      <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
+      <div className="col-span-9 px-2.5 py-2 text-slate-800">{value}</div>
+    </div>
+  );
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">임대안내문 부가 정보</span>
+        <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-600">
+          <input type="checkbox" defaultChecked className="accent-indigo-600" />
+          임대안내문 포함
+        </label>
+      </div>
+      <div>
+        <div className="grid grid-cols-12 text-[11px]">
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">무료 주차</div>
+          <div className="col-span-3 px-2.5 py-2 text-slate-800 border-r border-slate-100">{b.parkingFree || '-'}</div>
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">유료 주차</div>
+          <div className="col-span-3 px-2.5 py-2 text-slate-800">{b.parkingPaid || '-'}</div>
+        </div>
+        <Row label="냉 / 난방" value={
+          <select className="w-full bg-transparent text-slate-800 outline-none"><option>{b.heating || '냉/난방 유형 선택'}</option></select>
+        } />
+        <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">특이사항</div>
+          <div className="col-span-7 px-2.5 py-2 text-slate-800">{b.notes || '-'}</div>
+          <div className="col-span-2 px-2 py-1.5"><button className="w-full py-1 text-[10px] font-bold border border-slate-200 rounded hover:bg-slate-50">변경</button></div>
+        </div>
+        <Row label="위치 정보" value={b.locationInfo || '-'} />
+      </div>
+    </div>
+  );
+}
+
+/* ----- 컨택포인트 ----- */
+function ContactsSection({ building: b }) {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex flex-col" style={{minHeight: 280}}>
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">컨택포인트</span>
+        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">+ 담당자 추가</button>
+      </div>
+      <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold text-slate-500">
+        소속 / 이름 / 연락처
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {(b.contacts || []).length === 0 ? (
+          <div className="text-center text-[12px] text-slate-400 py-8">담당자가 등록되지 않았습니다</div>
+        ) : (
+          b.contacts.map((c, i) => (
+            <div key={i} className="flex gap-3 px-4 py-2.5 border-b border-slate-100 hover:bg-slate-50">
+              <div className="w-14 h-14 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 flex-shrink-0">
+                <ImageIcon size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-bold text-slate-800">{c.name} <span className="text-[10px] text-slate-500 font-normal">({c.role})</span></div>
+                {c.phone && <div className="text-[11px] text-slate-600 mt-0.5">{c.phone}</div>}
+                {c.phone2 && <div className="text-[11px] text-slate-600">{c.phone2}</div>}
+                {c.email && <div className="text-[11px] text-indigo-600 mt-0.5">{c.email}</div>}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ----- 기준층 정보 (평단가) ----- */
+function BaseStandardTable({ building: b }) {
+  const bs = b.baseStandard || {};
+  const cell = (v, suffix = '') => v != null && v !== '' ? v.toLocaleString() + suffix : '';
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">기준층 정보 (평단가)</span>
+        <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">지우기</button>
+      </div>
+      <table className="w-full text-[11px] tabular-nums">
+        <thead className="bg-slate-50">
+          <tr className="text-slate-500 font-semibold">
+            <th className="px-3 py-2 text-left w-8"><input type="checkbox" className="accent-indigo-600"/></th>
+            <th className="px-3 py-2 text-left">구분</th>
+            <th className="px-3 py-2 text-right">보증금</th>
+            <th className="px-3 py-2 text-right">임대료</th>
+            <th className="px-3 py-2 text-right">관리비</th>
+            <th className="px-3 py-2 text-right">NOC</th>
+            <th className="px-3 py-2 text-right">전용 면적</th>
+            <th className="px-3 py-2 text-right">임대 면적</th>
+            <th className="px-3 py-2 text-right">전용률(%)</th>
+            <th className="px-3 py-2 text-right">R/F</th>
+            <th className="px-3 py-2 text-right">F/O</th>
+            <th className="px-3 py-2 text-right">T/I</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-t border-slate-100">
+            <td className="px-3 py-2"><input type="checkbox" className="accent-indigo-600"/></td>
+            <td className="px-3 py-2 font-bold text-slate-800">기준층</td>
+            <td className="px-3 py-2 text-right">{cell(bs.deposit)}</td>
+            <td className="px-3 py-2 text-right">{cell(bs.rent)}</td>
+            <td className="px-3 py-2 text-right">{cell(bs.mgmt)}</td>
+            <td className="px-3 py-2 text-right">{cell(bs.noc)}</td>
+            <td className="px-3 py-2 text-right">{bs.netArea || ''}</td>
+            <td className="px-3 py-2 text-right">{bs.leaseArea || ''}</td>
+            <td className="px-3 py-2 text-right">{bs.occupancyRate || ''}</td>
+            <td className="px-3 py-2 text-right">{bs.rf ?? ''}</td>
+            <td className="px-3 py-2 text-right">{bs.fo ?? ''}</td>
+            <td className="px-3 py-2 text-right">{cell(bs.ti)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ----- 개별공실 정보 ----- */
+function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart }) {
+  const isInCart = (v) => cart.some(item => item.id === `${b.id}-${v.floor}`);
+  const cell = (v, suffix='') => v != null && v !== '' ? v.toLocaleString() + suffix : '';
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">개별공실 정보 <span className="text-[11px] text-slate-400 ml-1">({b.vacancies.length}건)</span></span>
+        <div className="flex items-center gap-2">
+          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">지우기</button>
+          <button onClick={() => onAddAllVacancies(b)} disabled={b.vacancies.length === 0}
+            className="px-2.5 py-1 text-[10px] font-bold rounded text-white"
+            style={{backgroundColor: b.vacancies.length === 0 ? '#cbd5e1' : REGION_COLORS[b.region].bg}}>전체 담기</button>
+          <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">추가</button>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        {b.vacancies.length === 0 ? (
+          <div className="text-center text-[12px] text-slate-400 py-10">등록된 공실이 없습니다</div>
+        ) : (
+          <table className="w-full text-[11px] tabular-nums">
+            <thead className="bg-slate-50">
+              <tr className="text-slate-500 font-semibold whitespace-nowrap">
+                <th className="px-2 py-2 text-left w-8"><input type="checkbox" className="accent-indigo-600"/></th>
+                <th className="px-2 py-2 text-left">계약상태</th>
+                <th className="px-2 py-2 text-left">구분</th>
+                <th className="px-2 py-2 text-left">지하/지상</th>
+                <th className="px-2 py-2 text-left">층</th>
+                <th className="px-2 py-2 text-right">임대 면적</th>
+                <th className="px-2 py-2 text-right">전용 면적</th>
+                <th className="px-2 py-2 text-right">전용률(%)</th>
+                <th className="px-2 py-2 text-left">입주 시기</th>
+                <th className="px-2 py-2 text-right">평당 보증금</th>
+                <th className="px-2 py-2 text-right">평당 임대료</th>
+                <th className="px-2 py-2 text-right">평당 관리비</th>
+                <th className="px-2 py-2 text-right">NOC</th>
+                <th className="px-2 py-2 text-right">R/F</th>
+                <th className="px-2 py-2 text-right">F/O</th>
+                <th className="px-2 py-2 text-right">T/I</th>
+                <th className="px-2 py-2 text-left">담기</th>
+              </tr>
+            </thead>
+            <tbody>
+              {b.vacancies.map((v, i) => {
+                const inCart = isInCart(v);
+                const statusColor = v.status === '계약완료' ? 'bg-green-100 text-green-700' : v.status === '모집중' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600';
+                return (
+                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                    <td className="px-2 py-2"><input type="checkbox" className="accent-indigo-600"/></td>
+                    <td className="px-2 py-2"><span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${statusColor}`}>{v.status}</span></td>
+                    <td className="px-2 py-2 text-slate-700">{v.type}</td>
+                    <td className="px-2 py-2 text-slate-700">{v.basement}</td>
+                    <td className="px-2 py-2 font-bold text-slate-800">{v.floor}</td>
+                    <td className="px-2 py-2 text-right">{v.area}</td>
+                    <td className="px-2 py-2 text-right">{v.net}</td>
+                    <td className="px-2 py-2 text-right">{v.occupancyRate}</td>
+                    <td className="px-2 py-2 text-slate-700">{v.when}</td>
+                    <td className="px-2 py-2 text-right">{cell(v.depositPerPy)}</td>
+                    <td className="px-2 py-2 text-right">{cell(v.rentPerPy)}</td>
+                    <td className="px-2 py-2 text-right">{cell(v.mgmtPerPy)}</td>
+                    <td className="px-2 py-2 text-right">{cell(v.noc)}</td>
+                    <td className="px-2 py-2 text-right">{v.rf ?? ''}</td>
+                    <td className="px-2 py-2 text-right">{v.fo ?? ''}</td>
+                    <td className="px-2 py-2 text-right">{cell(v.ti)}</td>
+                    <td className="px-2 py-2">
+                      <button onClick={() => onAddVacancy(b, v)} disabled={inCart}
+                        className={`text-[10px] font-bold whitespace-nowrap ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                        {inCart ? '담김' : '+ 담기'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * AllBuildingsPage - 전체 빌딩 리스트 페이지
+ * ============================================================ */
+function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart }) {
+  const [activeTab, setActiveTab] = useState('rental');  // 'rental' | 'mine'
+  const [sort, setSort] = useState('area');              // area | vacancy | base | noc | name
+  const [starred, setStarred] = useState(new Set());
+
+  const toggleStar = (id) => {
+    setStarred(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const sumVacArea = (b) => b.vacancies.reduce((s, v) => s + (v.area || 0), 0);
+
+  const sorted = useMemo(() => {
+    const arr = [...buildings];
+    arr.sort((a, b) => {
+      switch (sort) {
+        case 'vacancy': return sumVacArea(b) - sumVacArea(a);
+        case 'base':    return (b.baseLease || 0) - (a.baseLease || 0);
+        case 'noc':     return (b.noc || 0) - (a.noc || 0);
+        case 'name':    return a.name.localeCompare(b.name, 'ko');
+        case 'area':
+        default:        return (b.area || 0) - (a.area || 0);
+      }
+    });
+    return arr;
+  }, [buildings, sort]);
+
+  // 카트에 매물 들어있는 빌딩만 보기 (내 물건 탭)
+  const cartBuildingIds = new Set(cart.map(c => c.buildingId));
+  const filtered = activeTab === 'mine'
+    ? sorted.filter(b => cartBuildingIds.has(b.id))
+    : sorted;
+
+  const isInCartAny = (b) => b.vacancies.some(v => cart.some(item => item.id === `${b.id}-${v.floor}`));
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      {/* 탭 */}
+      <div className="bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+        <div className="flex">
+          <button onClick={() => setActiveTab('rental')}
+            className={`px-5 py-2.5 text-[12px] font-semibold border-b-2 ${activeTab === 'rental' ? 'text-rose-600 border-rose-600' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
+            임대 안내문
+          </button>
+          <button onClick={() => setActiveTab('mine')}
+            className={`px-5 py-2.5 text-[12px] font-semibold border-b-2 ${activeTab === 'mine' ? 'text-rose-600 border-rose-600' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
+            내 물건 {cartBuildingIds.size > 0 && <span className="ml-1 px-1.5 py-px text-[9px] bg-indigo-100 text-indigo-700 rounded-full">{cartBuildingIds.size}</span>}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 pr-4 text-[11px] text-slate-500">
+          <UserCheck size={12} />
+          김연중 이사 (LM본부) 님
+        </div>
+      </div>
+
+      {/* 헤더 (총 N개, 정렬, 신규 등록) */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+        <div className="text-[12px] font-semibold text-slate-700">
+          총 <span className="text-rose-600 font-bold">{filtered.length}</span> 개
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="area">연면적 순</option>
+            <option value="vacancy">총 공실면적 순</option>
+            <option value="base">기준층 면적 순</option>
+            <option value="noc">기준층 NOC 순</option>
+            <option value="name">빌딩명 (가나다)</option>
+          </select>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">신규 등록</button>
+        </div>
+      </div>
+
+      {/* 테이블 */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-[11px] tabular-nums bg-white">
+          <thead className="bg-slate-50 sticky top-0 z-10">
+            <tr className="text-slate-500 font-semibold border-b border-slate-200">
+              <th className="px-3 py-2 text-center w-8"></th>
+              <th className="px-3 py-2 text-left">빌딩명</th>
+              <th className="px-3 py-2 text-left">주소</th>
+              <th className="px-3 py-2 text-right">연면적</th>
+              <th className="px-3 py-2 text-right">총 공실면적</th>
+              <th className="px-3 py-2 text-right">기준층 면적</th>
+              <th className="px-3 py-2 text-right">기준층 NOC</th>
+              <th className="px-3 py-2 text-center w-20">상세</th>
+              <th className="px-3 py-2 text-center w-20">비교리스트</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan="9" className="text-center text-slate-400 py-12 text-[12px]">조건에 맞는 빌딩이 없습니다</td></tr>
+            ) : (
+              filtered.map(b => {
+                const vacSum = sumVacArea(b);
+                const isStar = starred.has(b.id);
+                const inCart = isInCartAny(b);
+                const color = REGION_COLORS[b.region];
+                return (
+                  <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => toggleStar(b.id)}
+                        className={isStar ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill={isStar ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                          <polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/>
+                        </svg>
+                      </button>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: color.bg}} title={color.name} />
+                        <span className="font-bold text-slate-800">{b.name}</span>
+                        {b.exclusive && <span className="px-1 py-px text-[9px] font-bold bg-indigo-100 text-indigo-700 rounded">전속</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 truncate" title={b.address}>{b.address}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{b.area ? b.area.toLocaleString() + ' 평' : '-'}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{vacSum > 0 ? vacSum.toFixed(0) + ' 평' : '-'}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{b.baseLease ? b.baseLease + ' 평' : '-'}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{b.noc ? b.noc.toLocaleString() + ' 원' : '-'}</td>
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => onOpenDetail(b.id)}
+                        className="px-3 py-1 text-[10px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-100 hover:border-slate-300">
+                        상세 보기
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => b.vacancies.forEach(v => onAddVacancy(b, v))}
+                        disabled={b.vacancies.length === 0}
+                        className={`px-3 py-1 text-[10px] font-semibold border rounded ${
+                          b.vacancies.length === 0 ? 'border-slate-100 text-slate-300 cursor-not-allowed' :
+                          inCart ? 'border-indigo-200 text-indigo-600 bg-indigo-50' :
+                          'border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                        }`}>
+                        {inCart ? '담김' : '담기'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
