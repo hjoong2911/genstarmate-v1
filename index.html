@@ -409,11 +409,13 @@ function GenstarMate() {
   const [detailOpen, setDetailOpen]       = useState(true);
   const [compareOpen, setCompareOpen]     = useState(false);
   const [pageView, setPageView]           = useState('map'); // 'map' | 'detail'
+  const [visitedIds, setVisitedIds]       = useState(new Set());
 
   const resetFilters = () => {
     setFilters(INITIAL_FILTERS);
     setActiveRegions(['CBD', 'GBD', 'YBD', 'BBD', 'OTHERS', 'OUT']);
     setOpenFilterKey(null);
+    setVisitedIds(new Set());
   };
 
   const visibleBuildings = useMemo(
@@ -521,6 +523,12 @@ function GenstarMate() {
   const handleSelectBuilding = useCallback((id) => {
     setSelectedId(id);
     setPhotoIdx(0);
+    setVisitedIds(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   }, []);
 
   return (
@@ -543,6 +551,7 @@ function GenstarMate() {
               <KakaoMap
                 buildings={visibleBuildings}
                 selectedId={selectedId}
+                visitedIds={visitedIds}
                 onMarkerClick={handleSelectBuilding} />
               <MapLegend />
               <MapStats count={visibleBuildings.length} regionCount={activeRegions.length} />
@@ -810,7 +819,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
 /* ============================================================
  * KakaoMap (요구사항 5, 6, 7) - 단순화된 초기화
  * ============================================================ */
-function KakaoMap({ buildings, selectedId, onMarkerClick }) {
+function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick }) {
   console.log("KAKAO MAP COMPONENT RENDERING - buildings:", buildings.length);
   const mapRef = useRef(null);
   const overlaysRef = useRef({});
@@ -886,7 +895,11 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
 
     buildings.forEach(b => {
       const isSelected = selectedId === b.id;
-      const color = REGION_COLORS[b.region].bg;
+      const isVisited = visitedIds && visitedIds.has(b.id);
+      const regionColor = REGION_COLORS[b.region].bg;
+      const color = regionColor;
+      const labelBg = isVisited ? '#1F2937' : regionColor; // 방문 시 어두운 회색(slate-800)
+      const pinFill = isVisited ? '#4B5563' : regionColor; // 방문 시 살짝 밝은 회색(slate-600)
       const pos = resolvePos(b);
 
       const div = document.createElement('div');
@@ -894,12 +907,12 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       div.style.cursor = 'pointer';
       div.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;transform:translate(0,-100%);">
-          <div style="background:${color};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);margin-bottom:2px;${isSelected ? 'transform:scale(1.12);outline:2px solid white;outline-offset:2px;' : ''}">
-            ${b.name}
+          <div style="background:${labelBg};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.25);margin-bottom:2px;${isSelected ? 'transform:scale(1.12);outline:2px solid white;outline-offset:2px;' : ''}${isVisited ? 'opacity:0.85;' : ''}">
+            ${b.name}${isVisited ? ' <span style="opacity:0.6;font-size:9px;margin-left:2px;">✓</span>' : ''}
           </div>
           <svg width="${isSelected ? 28 : 22}" height="${isSelected ? 38 : 30}" viewBox="0 0 20 28" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.35));">
             <path d="M 10 0 C 4.5 0, 0 4.5, 0 10 C 0 16, 10 28, 10 28 C 10 28, 20 16, 20 10 C 20 4.5, 15.5 0, 10 0 Z"
-                  fill="${color}" stroke="white" stroke-width="1.5"/>
+                  fill="${pinFill}" stroke="white" stroke-width="1.5"/>
             <circle cx="10" cy="10" r="3.5" fill="white"/>
           </svg>
         </div>
@@ -916,7 +929,7 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
       overlay.setMap(mapRef.current);
       overlaysRef.current[b.id] = overlay;
     });
-  }, [buildings, selectedId, mapReady, geocoded, onMarkerClick, resolvePos]);
+  }, [buildings, selectedId, mapReady, geocoded, visitedIds, onMarkerClick, resolvePos]);
 
   // 선택된 빌딩으로 지도 이동
   useEffect(() => {
