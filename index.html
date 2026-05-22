@@ -814,6 +814,7 @@ function GenstarMate() {
   const [compareOpen, setCompareOpen]     = useState(false);
   const [pageView, setPageView]           = useState('map'); // 'map' | 'detail'
   const [visitedIds, setVisitedIds]       = useState(new Set());
+  const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
 
   const resetFilters = () => {
     setFilters(INITIAL_FILTERS);
@@ -956,9 +957,10 @@ function GenstarMate() {
                 buildings={visibleBuildings}
                 selectedId={selectedId}
                 visitedIds={visitedIds}
-                onMarkerClick={handleSelectBuilding} />
+                onMarkerClick={handleSelectBuilding}
+                onViewBoundsChange={setInViewIds} />
               <MapLegend />
-              <MapStats count={visibleBuildings.length} regionCount={activeRegions.length} />
+              <MapStats count={inViewIds ? inViewIds.length : visibleBuildings.length} regionCount={activeRegions.length} />
             </div>
             {detailOpen ? (
               <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
@@ -972,7 +974,7 @@ function GenstarMate() {
                 <div className="text-[10px] font-semibold text-slate-500 group-hover:text-indigo-600" style={{writingMode:'vertical-rl'}}>상세 패널 펼치기</div>
               </button>
             )}
-            <CompactList buildings={visibleBuildings} selectedId={selectedId}
+            <CompactList buildings={inViewIds ? visibleBuildings.filter(b => inViewIds.includes(b.id)) : visibleBuildings} selectedId={selectedId}
               onSelect={handleSelectBuilding}
               onOpenDetail={(id) => { setSelectedId(id); setPageView('detail'); }} />
           </main>
@@ -1223,7 +1225,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
 /* ============================================================
  * KakaoMap (요구사항 5, 6, 7) - 단순화된 초기화
  * ============================================================ */
-function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick }) {
+function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick, onViewBoundsChange }) {
   console.log("KAKAO MAP COMPONENT RENDERING - buildings:", buildings.length);
   const mapRef = useRef(null);
   const overlaysRef = useRef({});
@@ -1253,6 +1255,19 @@ function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick }) {
       const map = new window.kakao.maps.Map(container, options);
       mapRef.current = map;
 
+      // 지도 이동/줌 종료 시 화면 안 빌딩 ID 목록을 부모에 전달
+      const fireBoundsUpdate = () => {
+        if (!onViewBoundsChange) return;
+        const bounds = map.getBounds();
+        const visible = BUILDINGS.filter(b => {
+          const g = (window.__GEOCODE_CACHE && window.__GEOCODE_CACHE[b.id]) || { lat: b.lat, lng: b.lng };
+          return bounds.contain(new window.kakao.maps.LatLng(g.lat, g.lng));
+        }).map(b => b.id);
+        onViewBoundsChange(visible);
+      };
+      window.kakao.maps.event.addListener(map, 'idle', fireBoundsUpdate);
+      window.kakao.maps.event.addListener(map, 'tilesloaded', fireBoundsUpdate);
+
       setTimeout(() => {
         if (!mapRef.current) return;
         mapRef.current.relayout();
@@ -1269,7 +1284,10 @@ function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick }) {
               done += 1;
               if (status === window.kakao.maps.services.Status.OK && result[0]) {
                 const r = result[0];
-                setGeocoded(prev => ({ ...prev, [b.id]: { lat: parseFloat(r.y), lng: parseFloat(r.x) } }));
+                const coord = { lat: parseFloat(r.y), lng: parseFloat(r.x) };
+                if (!window.__GEOCODE_CACHE) window.__GEOCODE_CACHE = {};
+                window.__GEOCODE_CACHE[b.id] = coord;
+                setGeocoded(prev => ({ ...prev, [b.id]: coord }));
                 console.log(`[geocode OK] ${b.name}: ${r.y}, ${r.x}`);
               } else {
                 failed.push(b);
@@ -1288,6 +1306,17 @@ function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick }) {
 
   // 지오코딩 완료 시 setBounds 호출하지 않음 — 초기 축적 유지
   // (사용자 요청: 지도 처음 구현할때 축적도 고정)
+  // 단, 지오코딩 결과가 갱신되면 화면 안 빌딩 목록 재계산
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !onViewBoundsChange) return;
+    const map = mapRef.current;
+    const bounds = map.getBounds();
+    const visible = buildings.filter(b => {
+      const g = geocoded[b.id] || { lat: b.lat, lng: b.lng };
+      return bounds.contain(new window.kakao.maps.LatLng(g.lat, g.lng));
+    }).map(b => b.id);
+    onViewBoundsChange(visible);
+  }, [mapReady, geocoded, buildings, onViewBoundsChange]);
 
   // 마커 업데이트 (buildings/selectedId/지오코딩 변경 시)
   useEffect(() => {
