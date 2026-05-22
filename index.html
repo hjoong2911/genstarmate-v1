@@ -589,6 +589,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
  * KakaoMap (요구사항 5, 6, 7) - 단순화된 초기화
  * ============================================================ */
 function KakaoMap({ buildings, selectedId, onMarkerClick }) {
+  console.log("KAKAO MAP COMPONENT RENDERING - buildings:", buildings.length);
   const mapRef = useRef(null);
   const overlaysRef = useRef({});
   const [mapReady, setMapReady] = useState(false);
@@ -683,7 +684,25 @@ function KakaoMap({ buildings, selectedId, onMarkerClick }) {
     mapRef.current.panTo(new window.kakao.maps.LatLng(building.lat, building.lng));
   }, [selectedId, buildings, mapReady]);
 
-  return <div id="kakao-map" style={{ width: '100%', height: '100%', minHeight: '100vh' }} />;
+  return (
+    <div
+      id="kakao-map"
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: '100vh',
+        background: 'yellow',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '20px',
+        fontWeight: 'bold',
+        color: '#333',
+      }}
+    >
+      KAKAO MAP AREA ACTIVE
+    </div>
+  );
 }
 
 function MapLegend() {
@@ -982,7 +1001,9 @@ function CartDrawer({ cart, onClose, onRemove, onClear }) {
   );
 }
 
+console.log("ABOUT TO RENDER REACT APP - root element:", document.getElementById('root'));
 ReactDOM.createRoot(document.getElementById('root')).render(<GenstarMate />);
+console.log("REACT APP RENDER CALLED");
 })();
 </script>
 </body>
