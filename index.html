@@ -724,7 +724,7 @@ const BUILDINGS = [
   },
 ];
 
-/* ===== 사이드바 메뉴 (요구사항 2 - 단순화) ===== */
+/* ===== 사이드바 메뉴 (개편) ===== */
 const NAV_SECTIONS = [
   { group: '메인', items: [
     { icon: Home, label: '홈 대시보드' }
@@ -732,21 +732,24 @@ const NAV_SECTIONS = [
   { group: '빌딩', items: [
     { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'], active: true, activeChild: '지도' }
   ]},
-  { group: '거래처 (관리 기업)', items: [
-    { icon: Briefcase, label: '거래처', children: ['전체 거래처'] }
+  { group: '거래처', items: [
+    { icon: Briefcase, label: '거래처', children: ['전체 거래처', 'My 거래처'] }
   ]},
-  { group: '고객 (담당자)', items: [
-    { icon: Users, label: '고객', children: ['전체 고객'] }
+  { group: '담당자 관리', items: [
+    { icon: Users, label: '담당자', children: ['전체 담당자'] }
   ]},
-  { group: '리드', items: [
-    { icon: UserCheck, label: '리드', children: ['전체 리드'] }
+  { group: '콜드콜', items: [
+    { icon: UserCheck, label: '콜드콜', children: ['전체 콜드콜', 'My 콜드콜'] }
+  ]},
+  { group: '영업 관리', items: [
+    { icon: Sparkles, label: '영업', children: ['전체 딜', 'My 딜'] }
   ]},
   { group: '계약 관리', items: [
-    { icon: FileText, label: '계약', children: ['전체 계약'] }
+    { icon: FileText, label: '계약', children: ['전체 계약', 'My 계약'] }
   ]},
 ];
 
-/* ===== 필터 (요구사항 8 - 그대로 유지) ===== */
+/* ===== 필터 ===== */
 const FILTER_DEFS = [
   { key: 'totalArea',     label: '전체 공실 전용',             unit: '평',    type: 'range' },
   { key: 'baseFloorArea', label: '층 공실 전용',               unit: '평',    type: 'range' },
@@ -758,6 +761,9 @@ const FILTER_DEFS = [
   { key: 'floors',        label: '층수',                       type: 'multi', options: ['1층', '지하층', '지상층(1층 제외)'] },
   { key: 'vacancy',       label: '공실',                       type: 'yn' },
   { key: 'parking',       label: '주차',                       type: 'multi', options: ['자주식', '기계식', '혼용'] },
+  { key: 'ownerType',     label: '소유주',                     type: 'multi', options: ['개인','법인','운용사','리츠','신탁사','공공기관','외국계','기타'] },
+  { key: 'forSale',       label: '매각 희망',                  type: 'yn' },
+  { key: 'mainUse',       label: '건물 주용도',                type: 'multi', options: ['사무실','상가','지식산업센터','물류센터','공장','오피스텔','복합시설','기타'] },
 ];
 
 const INITIAL_FILTERS = FILTER_DEFS.reduce((acc, def) => {
@@ -812,7 +818,8 @@ function GenstarMate() {
   const [cartOpen, setCartOpen]           = useState(false);
   const [detailOpen, setDetailOpen]       = useState(true);
   const [compareOpen, setCompareOpen]     = useState(false);
-  const [pageView, setPageView]           = useState('map'); // 'map' | 'detail'
+  const [pageView, setPageView]           = useState('map'); // 'map' | 'detail' | 'allBuildings'
+  const [previousView, setPreviousView]   = useState('map'); // 뒤로가기에서 돌아갈 페이지
   const [visitedIds, setVisitedIds]       = useState(new Set());
   const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
 
@@ -890,6 +897,16 @@ function GenstarMate() {
       // 주차
       if (filters.parking.length > 0 && !filters.parking.includes(b.parking)) return false;
 
+      // 소유주 유형
+      if (filters.ownerType.length > 0 && !filters.ownerType.includes(b.ownerType)) return false;
+
+      // 매각 희망 Y/N
+      if (filters.forSale === 'Y' && b.forSale !== 'Y') return false;
+      if (filters.forSale === 'N' && b.forSale !== 'N') return false;
+
+      // 건물 주용도
+      if (filters.mainUse.length > 0 && !filters.mainUse.includes(b.mainUse)) return false;
+
       return true;
     }),
     [activeRegions, filters]
@@ -939,7 +956,7 @@ function GenstarMate() {
   return (
     <div className="h-screen flex bg-slate-50 text-slate-800 overflow-hidden text-[13px]">
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
-        currentPage={pageView} onNavigate={setPageView} />
+        currentPage={pageView} onNavigate={(p) => { setPreviousView(p); setPageView(p); }} />
       <div className="flex-1 flex flex-col min-w-0">
         {pageView !== 'detail' && (
           <FilterBar filters={filters} setFilters={setFilters}
@@ -966,7 +983,7 @@ function GenstarMate() {
               <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
                 onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart}
                 onCollapse={() => setDetailOpen(false)}
-                onOpenDetail={() => setPageView('detail')} />
+                onOpenDetail={() => { setPreviousView('map'); setPageView('detail'); }} />
             ) : (
               <button onClick={() => setDetailOpen(true)}
                 className="w-8 bg-white border-l border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition flex-shrink-0 group">
@@ -976,17 +993,17 @@ function GenstarMate() {
             )}
             <CompactList buildings={inViewIds ? visibleBuildings.filter(b => inViewIds.includes(b.id)) : visibleBuildings} selectedId={selectedId}
               onSelect={handleSelectBuilding}
-              onOpenDetail={(id) => { setSelectedId(id); setPageView('detail'); }} />
+              onOpenDetail={(id) => { setSelectedId(id); setPreviousView('map'); setPageView('detail'); }} />
           </main>
         ) : pageView === 'detail' ? (
           <BuildingDetailPage building={selected}
-            onBack={() => setPageView('map')}
+            onBack={() => setPageView(previousView)}
             onAddVacancy={addToCart}
             onAddAllVacancies={addAllVacancies}
             cart={cart} />
         ) : (
           <AllBuildingsPage buildings={visibleBuildings} filters={filters}
-            onOpenDetail={(id) => { setSelectedId(id); setPageView('detail'); }}
+            onOpenDetail={(id) => { setSelectedId(id); setPreviousView('allBuildings'); setPageView('detail'); }}
             onAddVacancy={addToCart}
             cart={cart} />
         )}
@@ -1133,9 +1150,6 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
             {cartCount > 0 && (
               <span className="ml-0.5 px-1.5 py-0 text-[10px] font-bold bg-indigo-600 text-white rounded-full">{cartCount}</span>
             )}
-          </button>
-          <button className="px-3 py-1.5 text-[11px] font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1 shadow-sm">
-            <Plus size={12} /> 빌딩 등록
           </button>
         </div>
       </div>
@@ -2050,6 +2064,7 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
   const [memoInput, setMemoInput] = useState('');
   const [localMemos, setLocalMemos] = useState(building.memos || []);
   const [memoPage, setMemoPage] = useState(1);
+  const [editMode, setEditMode] = useState(false);
   const MEMO_PER_PAGE = 5;
 
   useEffect(() => {
@@ -2076,7 +2091,7 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
         <div className="flex items-center gap-3">
           <button onClick={onBack}
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 text-[12px] font-semibold transition">
-            <ChevronLeft size={14} /> 지도로 돌아가기
+            <ChevronLeft size={14} /> 뒤로 가기
           </button>
           <div className="h-4 w-px bg-slate-200" />
           <span className="px-2 py-0.5 text-[10px] font-bold rounded" style={{backgroundColor: color.light, color: color.text}}>{color.name}</span>
@@ -2085,8 +2100,17 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
           {building.exclusive && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-700 rounded">전속</span>}
         </div>
         <div className="flex items-center gap-2">
-          <button className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">제안서 출력</button>
-          <button className="px-3 py-1.5 text-[11px] font-bold text-white rounded" style={{backgroundColor: color.bg}}>저장</button>
+          {editMode ? (
+            <>
+              <button onClick={() => setEditMode(false)}
+                className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">취소</button>
+              <button onClick={() => setEditMode(false)}
+                className="px-3 py-1.5 text-[11px] font-bold text-white rounded" style={{backgroundColor: color.bg}}>저장</button>
+            </>
+          ) : (
+            <button onClick={() => setEditMode(true)}
+              className="px-3 py-1.5 text-[11px] font-bold text-white rounded" style={{backgroundColor: color.bg}}>수정</button>
+          )}
         </div>
       </div>
 
@@ -2099,10 +2123,11 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
             <BasicInfoForm building={building} />
           </div>
 
-          {/* MIDDLE: 임대안내문 + 컨택포인트 */}
+          {/* MIDDLE: 임대안내문 + 컨택포인트 + 소유주 */}
           <div className="space-y-4">
             <RentalInfoSection building={building} />
             <ContactsSection building={building} />
+            <OwnerSection building={building} />
           </div>
 
           {/* RIGHT: 메모 내역 */}
@@ -2156,8 +2181,20 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
           </div>
         </div>
 
+        {/* 건물 추가 정보 (역과의 거리, 대지 면적, 건물 주용도, 매각 희망, 당사 계약) */}
+        <ExtraInfoSection building={building} />
+
         {/* 기준층 정보 (평단가) */}
         <BaseStandardTable building={building} />
+
+        {/* 입주사 (렌트롤) — 거래처 페이지에서 불러오기 */}
+        <TenantsSection building={building} />
+
+        {/* 도면 — PDF / 사진 업로드 */}
+        <FloorPlansSection building={building} />
+
+        {/* 시장 계약 사례 — 계약 페이지에서 불러오기 */}
+        <MarketDealsSection building={building} />
 
         {/* 개별공실 정보 */}
         <VacancyDetailTable building={building} onAddVacancy={onAddVacancy} onAddAllVacancies={onAddAllVacancies} cart={cart} />
@@ -2313,6 +2350,184 @@ function ContactsSection({ building: b }) {
   );
 }
 
+/* ----- 소유주 정보 (컨택포인트 하단) ----- */
+function OwnerSection({ building: b }) {
+  const owner = b.owner || {};
+  const Row = ({ label, value }) => (
+    <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+      <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
+      <div className="col-span-9 px-2.5 py-2 text-slate-800">{value || <span className="text-slate-300">-</span>}</div>
+    </div>
+  );
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">소유주</span>
+        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">편집</button>
+      </div>
+      <div>
+        <Row label="소유주 유형" value={owner.type || <span className="text-slate-400">개인/법인/운용사/리츠/신탁사/공공기관/외국계/기타</span>} />
+        <Row label="소유주 명" value={owner.name} />
+        <Row label="PM 관리" value={owner.pm} />
+        <Row label="LM 관리" value={owner.lm} />
+      </div>
+    </div>
+  );
+}
+
+/* ----- 건물 추가 정보 (역과의 거리, 대지 면적, 건물 주용도, 매각 희망, 당사 계약) ----- */
+function ExtraInfoSection({ building: b }) {
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">건물 추가 정보</span>
+        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">편집</button>
+      </div>
+      <div className="grid grid-cols-5 text-[11px]">
+        <Cell label="역과의 거리" value={b.distFromStation ? `${b.distFromStation} m` : <span className="text-slate-300">수기 입력</span>} />
+        <Cell label="대지 면적" value={b.landArea ? `${b.landArea} ㎡` : <span className="text-slate-300">수기 입력</span>} />
+        <Cell label="기준층 임대면적" value={b.baseLease ? `${b.baseLease} 평` : <span className="text-slate-300">-</span>} />
+        <Cell label="기준층 전용면적" value={b.baseNet ? `${b.baseNet} 평` : <span className="text-slate-300">-</span>} />
+        <Cell label="건물 주용도" value={b.mainUse || <span className="text-slate-400">사무실/상가/지식산업센터/...</span>} last />
+      </div>
+      <div className="grid grid-cols-3 text-[11px] border-t border-slate-100">
+        <Cell label="매각 희망" value={
+          <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${b.forSale === 'Y' ? 'bg-rose-100 text-rose-700' : b.forSale === 'N' ? 'bg-slate-100 text-slate-600' : ''}`}>
+            {b.forSale || 'Y/N'}
+          </span>
+        } />
+        <Cell label="당사 계약" value={b.ourDeal || <span className="text-slate-300">수기 기입</span>} />
+        <Cell label="" value="" last />
+      </div>
+    </div>
+  );
+}
+
+function Cell({ label, value, last }) {
+  return (
+    <div className={`flex flex-col ${last ? '' : 'border-r border-slate-100'}`}>
+      <div className="bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 border-b border-slate-100">{label}</div>
+      <div className="px-2.5 py-2 text-slate-800">{value}</div>
+    </div>
+  );
+}
+
+/* ----- 입주사 (렌트롤) ----- */
+function TenantsSection({ building: b }) {
+  const tenants = b.tenants || []; // 거래처 페이지에서 불러옴 (현재는 빈 데이터)
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">입주사 <span className="text-[10px] font-normal text-slate-400 ml-1">(렌트롤 · 거래처 페이지 연동)</span></span>
+        <div className="flex items-center gap-2">
+          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">거래처에서 불러오기</button>
+          <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 추가</button>
+        </div>
+      </div>
+      {tenants.length === 0 ? (
+        <div className="text-center text-[11px] text-slate-400 py-8">등록된 입주사가 없습니다 · 거래처 페이지에서 불러올 수 있습니다</div>
+      ) : (
+        <table className="w-full text-[11px] tabular-nums">
+          <thead className="bg-slate-50">
+            <tr className="text-slate-500 font-semibold whitespace-nowrap">
+              <th className="px-3 py-2 text-left">층</th>
+              <th className="px-3 py-2 text-left">회사명</th>
+              <th className="px-3 py-2 text-right">임대 면적</th>
+              <th className="px-3 py-2 text-right">전용 면적</th>
+              <th className="px-3 py-2 text-left">계약 기간</th>
+              <th className="px-3 py-2 text-left">임차 조건</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tenants.map((t, i) => (
+              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2">{t.floor}</td>
+                <td className="px-3 py-2 font-semibold">{t.company}</td>
+                <td className="px-3 py-2 text-right">{t.leaseArea}</td>
+                <td className="px-3 py-2 text-right">{t.netArea}</td>
+                <td className="px-3 py-2">{t.period}</td>
+                <td className="px-3 py-2 text-slate-600">{t.terms}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/* ----- 도면 (PDF / 사진 업로드) ----- */
+function FloorPlansSection({ building: b }) {
+  const plans = b.floorPlans || [];
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">도면 <span className="text-[10px] font-normal text-slate-400 ml-1">(PDF · 사진 파일)</span></span>
+        <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 파일 업로드</button>
+      </div>
+      {plans.length === 0 ? (
+        <div className="text-center text-[11px] text-slate-400 py-8">등록된 도면 파일이 없습니다 · PDF, JPG, PNG 업로드 가능</div>
+      ) : (
+        <div className="grid grid-cols-4 gap-2 p-3">
+          {plans.map((p, i) => (
+            <div key={i} className="border border-slate-200 rounded p-2 hover:border-slate-300">
+              <div className="aspect-[4/3] bg-slate-100 rounded flex items-center justify-center text-slate-400">
+                <FileText size={20} />
+              </div>
+              <div className="text-[11px] font-semibold mt-1.5 truncate">{p.name}</div>
+              <div className="text-[10px] text-slate-500">{p.size}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ----- 시장 계약 사례 ----- */
+function MarketDealsSection({ building: b }) {
+  const deals = b.marketDeals || [];
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">시장 계약 사례 <span className="text-[10px] font-normal text-slate-400 ml-1">(계약 페이지 연동)</span></span>
+        <div className="flex items-center gap-2">
+          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">계약에서 불러오기</button>
+          <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 추가</button>
+        </div>
+      </div>
+      {deals.length === 0 ? (
+        <div className="text-center text-[11px] text-slate-400 py-8">등록된 계약 사례가 없습니다 · 계약 페이지에서 불러올 수 있습니다</div>
+      ) : (
+        <table className="w-full text-[11px] tabular-nums">
+          <thead className="bg-slate-50">
+            <tr className="text-slate-500 font-semibold whitespace-nowrap">
+              <th className="px-3 py-2 text-left">층</th>
+              <th className="px-3 py-2 text-left">회사명</th>
+              <th className="px-3 py-2 text-right">임대 면적</th>
+              <th className="px-3 py-2 text-right">전용 면적</th>
+              <th className="px-3 py-2 text-left">계약 기간</th>
+              <th className="px-3 py-2 text-left">임차 조건</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deals.map((d, i) => (
+              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2">{d.floor}</td>
+                <td className="px-3 py-2 font-semibold">{d.company}</td>
+                <td className="px-3 py-2 text-right">{d.leaseArea}</td>
+                <td className="px-3 py-2 text-right">{d.netArea}</td>
+                <td className="px-3 py-2">{d.period}</td>
+                <td className="px-3 py-2 text-slate-600">{d.terms}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 /* ----- 기준층 정보 (평단가) ----- */
 function BaseStandardTable({ building: b }) {
   const bs = b.baseStandard || {};
@@ -2446,7 +2661,6 @@ function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart
  * AllBuildingsPage - 전체 빌딩 리스트 페이지
  * ============================================================ */
 function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart }) {
-  const [activeTab, setActiveTab] = useState('rental');  // 'rental' | 'mine'
   const [sort, setSort] = useState('area');              // area | vacancy | base | noc | name
   const [starred, setStarred] = useState(new Set());
 
@@ -2475,35 +2689,13 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
     return arr;
   }, [buildings, sort]);
 
-  // 카트에 매물 들어있는 빌딩만 보기 (내 물건 탭)
-  const cartBuildingIds = new Set(cart.map(c => c.buildingId));
-  const filtered = activeTab === 'mine'
-    ? sorted.filter(b => cartBuildingIds.has(b.id))
-    : sorted;
+  const filtered = sorted;
 
   const isInCartAny = (b) => b.vacancies.some(v => cart.some(item => item.id === `${b.id}-${v.floor}`));
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-      {/* 탭 */}
-      <div className="bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-        <div className="flex">
-          <button onClick={() => setActiveTab('rental')}
-            className={`px-5 py-2.5 text-[12px] font-semibold border-b-2 ${activeTab === 'rental' ? 'text-rose-600 border-rose-600' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
-            임대 안내문
-          </button>
-          <button onClick={() => setActiveTab('mine')}
-            className={`px-5 py-2.5 text-[12px] font-semibold border-b-2 ${activeTab === 'mine' ? 'text-rose-600 border-rose-600' : 'text-slate-500 border-transparent hover:text-slate-700'}`}>
-            내 물건 {cartBuildingIds.size > 0 && <span className="ml-1 px-1.5 py-px text-[9px] bg-indigo-100 text-indigo-700 rounded-full">{cartBuildingIds.size}</span>}
-          </button>
-        </div>
-        <div className="flex items-center gap-2 pr-4 text-[11px] text-slate-500">
-          <UserCheck size={12} />
-          김연중 이사 (LM본부) 님
-        </div>
-      </div>
-
-      {/* 헤더 (총 N개, 정렬, 신규 등록) */}
+      {/* 헤더 (총 N개, 정렬, 신규 등록 / 빌딩 등록) */}
       <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <div className="text-[12px] font-semibold text-slate-700">
           총 <span className="text-rose-600 font-bold">{filtered.length}</span> 개
@@ -2517,7 +2709,9 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
             <option value="noc">기준층 NOC 순</option>
             <option value="name">빌딩명 (가나다)</option>
           </select>
-          <button className="px-3 py-1.5 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">신규 등록</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
+            <Plus size={12} /> 빌딩 등록
+          </button>
         </div>
       </div>
 
