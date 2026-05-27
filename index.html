@@ -2862,14 +2862,123 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
   const [page, setPage] = useState(1);
   const PER = 12;
 
+  // 필터 상태
+  const [filters, setFilters] = useState({
+    name: '', address: '',
+    bizType: [],     // 사업자 형태
+    classCat: [],    // 거래처 분류
+    grade: [],       // 거래처 등급
+    nation: 'all',   // 거래처 국가
+    site: 'all',     // 사업장 구분
+    branch: 'all',   // 지점보유 Y/N
+    contract: 'all', // 당사 계약 Y/N
+    expiryType: 'all', // 만기일 구분
+    expDateMin: '', expDateMax: '',
+    cfDateMin: '', cfDateMax: '',
+    expAreaMin: '', expAreaMax: '',
+    cfAreaMin: '', cfAreaMax: '',
+    deal: 'all',     // 딜 진행
+    inactive: 'all', // 미관리 대상
+    inactiveReason: [],
+    manager: 'all',  // 담당자 유무
+    phone: 'all',    // 핸드폰 유무
+    email: 'all',    // 이메일 유무
+    tel: 'all',      // 회사번호 유무
+  });
+  const [openF, setOpenF] = useState(null);
+
+  const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
+  const toggleArr = (k, v) => setFilters(p => ({
+    ...p, [k]: p[k].includes(v) ? p[k].filter(x => x !== v) : [...p[k], v]
+  }));
+  const hasValue = (k) => {
+    const v = filters[k];
+    if (Array.isArray(v)) return v.length > 0;
+    return v && v !== 'all' && v !== '';
+  };
+  const resetFilter = (k) => {
+    if (Array.isArray(filters[k])) updateF(k, []);
+    else if (['nation','site','branch','contract','expiryType','deal','inactive','manager','phone','email','tel'].includes(k)) updateF(k, 'all');
+    else updateF(k, '');
+  };
+  const resetAll = () => setFilters({
+    name: '', address: '', bizType: [], classCat: [], grade: [], nation: 'all', site: 'all',
+    branch: 'all', contract: 'all', expiryType: 'all', expDateMin: '', expDateMax: '',
+    cfDateMin: '', cfDateMax: '', expAreaMin: '', expAreaMax: '', cfAreaMin: '', cfAreaMax: '',
+    deal: 'all', inactive: 'all', inactiveReason: [], manager: 'all', phone: 'all', email: 'all', tel: 'all',
+  });
+
+  // 외부 클릭으로 dropdown 닫기
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('.f-btn-wrap')) setOpenF(null);
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
+  // 필터 + 정렬 적용
   const filtered = useMemo(() => {
-    let arr = COMPANIES.filter(c => !onlyMy || c.my);
+    const parseNum = (s) => parseInt(String(s).replace(/[^0-9]/g, '')) || 0;
+    let arr = COMPANIES.filter(c => {
+      if (onlyMy && !c.my) return false;
+      // 거래처명/주소 검색
+      if (filters.name && !c.n.toLowerCase().includes(filters.name.toLowerCase())) return false;
+      if (filters.address && !c.주소.toLowerCase().includes(filters.address.toLowerCase())) return false;
+      // 사업자 형태
+      if (filters.bizType.length > 0 && !filters.bizType.includes(c.구)) return false;
+      // 거래처 분류
+      if (filters.classCat.length > 0 && !filters.classCat.includes(c.규)) return false;
+      // 거래처 등급
+      if (filters.grade.length > 0 && !filters.grade.includes(c.g)) return false;
+      // 국가
+      if (filters.nation !== 'all' && c.국 !== filters.nation) return false;
+      // 사업장 구분
+      if (filters.site !== 'all' && c.사 !== filters.site) return false;
+      // 지점보유
+      if (filters.branch !== 'all' && c.지 !== filters.branch) return false;
+      // 당사 계약
+      if (filters.contract !== 'all' && c.계 !== filters.contract) return false;
+      // 만기일 구분
+      if (filters.expiryType === '예상' && c.예유 !== 'Y') return false;
+      if (filters.expiryType === '확정' && c.확만 === '-') return false;
+      if (filters.expiryType === '예상+확정' && c.예유 !== 'Y' && c.확만 === '-') return false;
+      if (filters.expiryType === '미확인' && (c.예유 === 'Y' || c.확만 !== '-')) return false;
+      // 예상 만기일 범위
+      if (filters.expDateMin && c.예 < filters.expDateMin.replace(/-/g,'.')) return false;
+      if (filters.expDateMax && c.예 !== '-' && c.예 > filters.expDateMax.replace(/-/g,'.')) return false;
+      // 확정 만기일 범위
+      if (filters.cfDateMin && (c.확만 === '-' || c.확만 < filters.cfDateMin.replace(/-/g,'.'))) return false;
+      if (filters.cfDateMax && c.확만 !== '-' && c.확만 > filters.cfDateMax.replace(/-/g,'.')) return false;
+      // 예상/확정 임차 면적
+      const expArea = parseNum(c.예면), cfArea = parseNum(c.확임);
+      if (filters.expAreaMin && expArea < +filters.expAreaMin) return false;
+      if (filters.expAreaMax && expArea > +filters.expAreaMax) return false;
+      if (filters.cfAreaMin && cfArea < +filters.cfAreaMin) return false;
+      if (filters.cfAreaMax && cfArea > +filters.cfAreaMax) return false;
+      // 딜 진행
+      if (filters.deal !== 'all' && c.딜 !== filters.deal) return false;
+      // 미관리 대상
+      if (filters.inactive !== 'all' && c.비 !== filters.inactive) return false;
+      // 유무
+      if (filters.manager !== 'all' && c.주담 !== filters.manager) return false;
+      if (filters.phone !== 'all' && c.폰 !== filters.phone) return false;
+      if (filters.email !== 'all' && c.메 !== filters.email) return false;
+      if (filters.tel !== 'all' && c.회 !== filters.tel) return false;
+      return true;
+    });
+
     arr.sort((a, b) => {
       switch (sort) {
-        case 'area':  return parseInt(b.현.replace(/[^0-9]/g,'')) - parseInt(a.현.replace(/[^0-9]/g,''));
+        case 'area':  return parseNum(b.현) - parseNum(a.현);
         case 'grade': return a.g.localeCompare(b.g);
         case 'name':  return a.n.localeCompare(b.n, 'ko');
-        case 'recent': return a.접.localeCompare(b.접);
+        case 'recent': return b.접.localeCompare(a.접);
+        case 'longUncontact': return a.접.localeCompare(b.접);
+        case 'cfExpiry':
+          const ax = a.확만 !== '-' ? a.확만 : 'zzzz';
+          const bx = b.확만 !== '-' ? b.확만 : 'zzzz';
+          return ax.localeCompare(bx);
         case 'expiry':
         default:
           const av = a.확만 !== '-' ? a.확만 : a.예유 === 'Y' ? a.예 : 'zzzz';
@@ -2878,10 +2987,13 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
       }
     });
     return arr;
-  }, [onlyMy, sort]);
+  }, [onlyMy, sort, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
   const paged = filtered.slice((page-1)*PER, page*PER);
+
+  // 페이지 초과 시 1로 복귀
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
 
   const toggleStar = (id) => setStarred(p => {
     const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n;
@@ -2903,6 +3015,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      {/* Top bar */}
       <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <Briefcase size={16} className="text-indigo-600" />
@@ -2910,27 +3023,105 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
           <span className="text-[11px] text-slate-400">관리 기업 마스터 DB</span>
         </div>
         <div className="flex items-center gap-2">
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
-            <option value="expiry">만기일 임박순</option>
-            <option value="area">면적 큰 순</option>
-            <option value="grade">등급 높은 순</option>
-            <option value="recent">최근 접촉 순</option>
-            <option value="name">가나다 순</option>
-          </select>
+          <button onClick={resetAll} className="px-2.5 py-1.5 text-[11px] text-slate-600 hover:text-indigo-600">↺ 초기화</button>
           <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
             <Plus size={12} /> 거래처 등록
           </button>
         </div>
       </div>
 
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 flex-wrap flex-shrink-0 text-[11px]">
-        <span className="text-slate-500 font-semibold mr-1">필터</span>
-        {['거래처명','주소','사업자 형태','거래처 분류','거래처 등급','국가','사업장','당사 계약','만기일 구분','예상 만기일','확정 만기일','예상 면적','확정 면적','딜 진행','담당자 유무'].map(l => (
-          <button key={l} className="px-2.5 py-1 border border-slate-200 rounded text-slate-700 hover:bg-slate-50 hover:border-slate-300 flex items-center gap-1">
-            {l} <ChevronDown size={10} />
-          </button>
-        ))}
+      {/* Filter bar - row 1 */}
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-100">
+        <span className="text-[11px] text-slate-500 font-semibold mr-1">필터</span>
+        <FilterBtn label="🔍 거래처명" k="name" openF={openF} setOpenF={setOpenF} hasValue={hasValue('name')}>
+          <input type="text" value={filters.name} onChange={e => updateF('name', e.target.value)}
+            placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="주소" k="address" openF={openF} setOpenF={setOpenF} hasValue={hasValue('address')}>
+          <input type="text" value={filters.address} onChange={e => updateF('address', e.target.value)}
+            placeholder="주소 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="사업자 형태" k="bizType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('bizType')}>
+          <MultiOpts opts={['법인사업자','개인사업자','개인사','공공기관','비영리법인','기타']} selected={filters.bizType} onToggle={v => toggleArr('bizType', v)}/>
+        </FilterBtn>
+        <FilterBtn label="거래처 분류" k="classCat" openF={openF} setOpenF={setOpenF} hasValue={hasValue('classCat')}>
+          <MultiOpts opts={['대기업','중견기업','중소기업','공기관','기타']} selected={filters.classCat} onToggle={v => toggleArr('classCat', v)}/>
+        </FilterBtn>
+        <FilterBtn label="☆ 거래처 등급" k="grade" openF={openF} setOpenF={setOpenF} hasValue={hasValue('grade')} highlight>
+          <MultiOpts opts={['A (최우선)','B (우선)','C (중기)','D (잠재)','E (관찰)','F (비활성)']}
+            selected={filters.grade.map(g => g)}
+            onToggle={v => toggleArr('grade', v[0])}
+            renderLabel={v => v}
+            keyOf={v => v[0]}/>
+        </FilterBtn>
+        <FilterBtn label="거래처 국가" k="nation" openF={openF} setOpenF={setOpenF} hasValue={hasValue('nation')}>
+          <RadioOpts name="nation" opts={[['all','전체'],['국내','국내'],['글로벌','글로벌']]} value={filters.nation} onChange={v => updateF('nation', v)}/>
+        </FilterBtn>
+        <FilterBtn label="사업장 구분" k="site" openF={openF} setOpenF={setOpenF} hasValue={hasValue('site')}>
+          <RadioOpts name="site" opts={[['all','전체'],['본사','본점'],['지점','지점']]} value={filters.site} onChange={v => updateF('site', v)}/>
+        </FilterBtn>
+        <FilterBtn label="지점보유 여부" k="branch" openF={openF} setOpenF={setOpenF} hasValue={hasValue('branch')}>
+          <RadioOpts name="branch" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.branch} onChange={v => updateF('branch', v)}/>
+        </FilterBtn>
+        <FilterBtn label="당사 계약 여부" k="contract" openF={openF} setOpenF={setOpenF} hasValue={hasValue('contract')}>
+          <RadioOpts name="contract" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.contract} onChange={v => updateF('contract', v)}/>
+        </FilterBtn>
+      </div>
+
+      {/* Filter bar - row 2 */}
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
+        <span className="text-[11px] text-slate-300 mr-1">　</span>
+        <FilterBtn label="📋 만기일 구분" k="expiryType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('expiryType')}>
+          <RadioOpts name="expiryType" opts={[['all','전체'],['예상','예상 만기일'],['확정','확정 만기일'],['예상+확정','예상+확정'],['미확인','미확인']]} value={filters.expiryType} onChange={v => updateF('expiryType', v)}/>
+        </FilterBtn>
+        <FilterBtn label="📅 예상 만기일" k="expDate" openF={openF} setOpenF={setOpenF} hasValue={filters.expDateMin || filters.expDateMax}>
+          <DateRange minVal={filters.expDateMin} maxVal={filters.expDateMax}
+            onMin={v => updateF('expDateMin', v)} onMax={v => updateF('expDateMax', v)}/>
+        </FilterBtn>
+        <FilterBtn label="📅 확정 만기일" k="cfDate" openF={openF} setOpenF={setOpenF} hasValue={filters.cfDateMin || filters.cfDateMax}>
+          <DateRange minVal={filters.cfDateMin} maxVal={filters.cfDateMax}
+            onMin={v => updateF('cfDateMin', v)} onMax={v => updateF('cfDateMax', v)}/>
+        </FilterBtn>
+        <FilterBtn label="예상 임차 면적(평)" k="expArea" openF={openF} setOpenF={setOpenF} hasValue={filters.expAreaMin || filters.expAreaMax}>
+          <NumRange minVal={filters.expAreaMin} maxVal={filters.expAreaMax}
+            onMin={v => updateF('expAreaMin', v)} onMax={v => updateF('expAreaMax', v)} unit="평"/>
+        </FilterBtn>
+        <FilterBtn label="확정 임차 면적(평)" k="cfArea" openF={openF} setOpenF={setOpenF} hasValue={filters.cfAreaMin || filters.cfAreaMax}>
+          <NumRange minVal={filters.cfAreaMin} maxVal={filters.cfAreaMax}
+            onMin={v => updateF('cfAreaMin', v)} onMax={v => updateF('cfAreaMax', v)} unit="평"/>
+        </FilterBtn>
+        <FilterBtn label="딜 진행중" k="deal" openF={openF} setOpenF={setOpenF} hasValue={hasValue('deal')}>
+          <RadioOpts name="deal" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.deal} onChange={v => updateF('deal', v)}/>
+        </FilterBtn>
+        <FilterBtn label="미관리 대상" k="inactive" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactive')}>
+          <RadioOpts name="inactive" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.inactive} onChange={v => updateF('inactive', v)}/>
+        </FilterBtn>
+        <FilterBtn label="미관리 사유" k="inactiveReason" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactiveReason')}>
+          <MultiOpts opts={['경쟁업체 부동산','임대인','폐업','기타']} selected={filters.inactiveReason} onToggle={v => toggleArr('inactiveReason', v)}/>
+        </FilterBtn>
+        <FilterBtn label="담당자 유무" k="manager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('manager')}>
+          <RadioOpts name="manager" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.manager} onChange={v => updateF('manager', v)}/>
+        </FilterBtn>
+        <FilterBtn label="핸드폰 유무" k="phone" openF={openF} setOpenF={setOpenF} hasValue={hasValue('phone')}>
+          <RadioOpts name="phone" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.phone} onChange={v => updateF('phone', v)}/>
+        </FilterBtn>
+        <FilterBtn label="이메일 유무" k="email" openF={openF} setOpenF={setOpenF} hasValue={hasValue('email')}>
+          <RadioOpts name="email" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.email} onChange={v => updateF('email', v)}/>
+        </FilterBtn>
+        <FilterBtn label="회사번호 유무" k="tel" openF={openF} setOpenF={setOpenF} hasValue={hasValue('tel')}>
+          <RadioOpts name="tel" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.tel} onChange={v => updateF('tel', v)}/>
+        </FilterBtn>
+        {/* 정렬 — 우측 끝 (필터 결과 정렬 컨텍스트) */}
+        <select value={sort} onChange={e => setSort(e.target.value)}
+          className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value="expiry">예상 만기일 임박순</option>
+          <option value="cfExpiry">확정 만기일 임박순</option>
+          <option value="area">면적 큰 순</option>
+          <option value="grade">등급 높은 순</option>
+          <option value="recent">최근 접촉 순</option>
+          <option value="longUncontact">장기 미접촉 순</option>
+          <option value="name">가나다 순</option>
+        </select>
       </div>
 
       <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
@@ -3244,6 +3435,91 @@ function CompanyDetailPage({ companyId, onBack }) {
           )}
         </Section>
       </div>
+    </div>
+  );
+}
+
+/* ----- 거래처 필터 헬퍼 컴포넌트 ----- */
+function FilterBtn({ label, k, openF, setOpenF, hasValue, highlight, children }) {
+  const open = openF === k;
+  return (
+    <div className="f-btn-wrap relative inline-block">
+      <button onClick={e => { e.stopPropagation(); setOpenF(open ? null : k); }}
+        className={`px-2.5 py-1.5 text-[11px] font-medium rounded border flex items-center gap-1 transition whitespace-nowrap ${
+          open ? 'bg-indigo-600 text-white border-indigo-600' :
+          highlight ? 'bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold' :
+          hasValue ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+          'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+        }`}>
+        {label}
+        {hasValue && !open && <span className="w-1 h-1 rounded-full bg-indigo-500"/>}
+        <ChevronDown size={10} className={`transition ${open ? 'rotate-180' : ''}`}/>
+      </button>
+      {open && (
+        <div onClick={e => e.stopPropagation()}
+          className="absolute top-full left-0 mt-1.5 min-w-[200px] bg-white rounded-lg shadow-xl border border-slate-200 p-3 z-50">
+          {children}
+          <div className="mt-2.5 pt-2 border-t border-slate-100 flex justify-end">
+            <button onClick={() => setOpenF(null)}
+              className="px-3 py-1 text-[11px] font-bold bg-slate-700 text-white rounded hover:bg-slate-800">적용 · 닫기</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiOpts({ opts, selected, onToggle, renderLabel, keyOf }) {
+  const k = keyOf || (v => v);
+  const rl = renderLabel || (v => v);
+  return (
+    <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+      {opts.map(o => (
+        <label key={o} className="flex items-center gap-2 px-1.5 py-1 text-[12px] hover:bg-slate-50 rounded cursor-pointer">
+          <input type="checkbox" checked={selected.includes(k(o))}
+            onChange={() => onToggle(o)} className="accent-indigo-600"/>
+          {rl(o)}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function RadioOpts({ name, opts, value, onChange }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {opts.map(([v, l]) => (
+        <label key={v} className="flex items-center gap-2 px-1.5 py-1 text-[12px] hover:bg-slate-50 rounded cursor-pointer">
+          <input type="radio" name={name} checked={value === v}
+            onChange={() => onChange(v)} className="accent-indigo-600"/>
+          {l}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function DateRange({ minVal, maxVal, onMin, onMax }) {
+  return (
+    <div className="flex items-center gap-1">
+      <input type="date" value={minVal} onChange={e => onMin(e.target.value)}
+        className="px-1.5 py-1 text-[11px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+      <span className="text-slate-400">~</span>
+      <input type="date" value={maxVal} onChange={e => onMax(e.target.value)}
+        className="px-1.5 py-1 text-[11px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+    </div>
+  );
+}
+
+function NumRange({ minVal, maxVal, onMin, onMax, unit }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <input type="number" placeholder="최소" value={minVal} onChange={e => onMin(e.target.value)}
+        className="w-20 px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+      <span className="text-slate-400">~</span>
+      <input type="number" placeholder="최대" value={maxVal} onChange={e => onMax(e.target.value)}
+        className="w-20 px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+      {unit && <span className="text-[11px] text-slate-500">{unit}</span>}
     </div>
   );
 }
