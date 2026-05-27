@@ -1146,7 +1146,7 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
 /* ============================================================
  * FilterBar (요구사항 8)
  * ============================================================ */
-function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFilterValue, activeRegions, setActiveRegions, resetFilters, cartCount, onCartClick }) {
+function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFilterValue, activeRegions, setActiveRegions, resetFilters, cartCount, onCartClick, pageView }) {
   const updateRange = (key, field, val) =>
     setFilters({ ...filters, [key]: { ...filters[key], [field]: val } });
 
