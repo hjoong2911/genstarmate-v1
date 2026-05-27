@@ -808,7 +808,7 @@ const avgVacancyNoc  = (b) => b.vacancies.length > 0
  * Main
  * ============================================================ */
 function GenstarMate() {
-  const [selectedId, setSelectedId]       = useState(1);
+  const [selectedId, setSelectedId]       = useState(null);
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [filters, setFilters]             = useState(INITIAL_FILTERS);
   const [openFilterKey, setOpenFilterKey] = useState(null);
@@ -913,7 +913,7 @@ function GenstarMate() {
     [activeRegions, filters]
   );
 
-  const selected = BUILDINGS.find(b => b.id === selectedId) || BUILDINGS[0];
+  const selected = BUILDINGS.find(b => b.id === selectedId) || null;
 
   const hasFilterValue = (key) => {
     const v = filters[key];
@@ -980,18 +980,18 @@ function GenstarMate() {
               <MapLegend />
               <MapStats count={inViewIds ? inViewIds.length : visibleBuildings.length} regionCount={activeRegions.length} />
             </div>
-            {detailOpen ? (
+            {detailOpen && selected ? (
               <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
                 onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart}
                 onCollapse={() => setDetailOpen(false)}
                 onOpenDetail={() => { setPreviousView('map'); setPageView('detail'); }} />
-            ) : (
+            ) : selected ? (
               <button onClick={() => setDetailOpen(true)}
                 className="w-8 bg-white border-l border-slate-200 flex flex-col items-center justify-center gap-2 hover:bg-slate-50 transition flex-shrink-0 group">
                 <PanelLeftOpen size={14} className="text-slate-400 group-hover:text-indigo-600" />
                 <div className="text-[10px] font-semibold text-slate-500 group-hover:text-indigo-600" style={{writingMode:'vertical-rl'}}>상세 패널 펼치기</div>
               </button>
-            )}
+            ) : null}
             <CompactList buildings={inViewIds ? visibleBuildings.filter(b => inViewIds.includes(b.id)) : visibleBuildings} selectedId={selectedId}
               onSelect={handleSelectBuilding}
               onOpenDetail={(id) => { setSelectedId(id); setPreviousView('map'); setPageView('detail'); }} />
@@ -1301,7 +1301,7 @@ function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick, onViewBoun
 
       const options = {
         center: new window.kakao.maps.LatLng(37.5400, 127.0500),
-        level: 8,   // 고정 축적 (1=가장확대 ~ 14=가장축소)
+        level: 7,   // 약 1km 축척 (1=가장확대 ~ 14=가장축소)
       };
       const map = new window.kakao.maps.Map(container, options);
       mapRef.current = map;
@@ -2160,7 +2160,7 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
               <BuildingPhoto building={building} />
               <BasicInfoForm building={building} editMode={editMode} />
             </div>
-            <ExtraInfoSection building={building} />
+            <ExtraInfoSection building={building} editMode={editMode} />
           </div>
 
           {/* MIDDLE: 임대안내문 + 컨택포인트 + 소유주(+매각희망 포함) */}
@@ -2565,11 +2565,16 @@ function OwnerSection({ building: b }) {
 }
 
 /* ----- 건물 추가 정보 (역과의 거리, 대지 면적, 기준층 임대/전용면적, 건물 주용도) ----- */
-function ExtraInfoSection({ building: b }) {
+function ExtraInfoSection({ building: b, editMode }) {
   const [distEdit, setDistEdit] = useState(b.distFromStation || '');
   const [landEdit, setLandEdit] = useState(b.landArea || '');
+  const [baseLeaseEdit, setBaseLeaseEdit] = useState(b.baseLease || '');
+  const [baseNetEdit, setBaseNetEdit] = useState(b.baseNet || '');
   const [useEdit, setUseEdit] = useState(b.mainUse || '');
   const USES = ['사무실','상가','지식산업센터','물류센터','공장','오피스텔','복합시설','기타'];
+
+  const inputClass = "w-full px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500";
+
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -2579,32 +2584,56 @@ function ExtraInfoSection({ building: b }) {
       <div className="grid grid-cols-12 text-[11px]">
         <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">역과의 거리</div>
         <div className="col-span-8 px-2 py-1 flex items-center gap-1">
-          <input type="number" value={distEdit} onChange={e => setDistEdit(e.target.value)}
-            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
-          <span className="text-slate-500 text-[10px]">m</span>
+          {editMode ? (
+            <>
+              <input type="number" value={distEdit} onChange={e => setDistEdit(e.target.value)}
+                placeholder="수기 입력" className={inputClass}/>
+              <span className="text-slate-500 text-[10px]">m</span>
+            </>
+          ) : (distEdit ? <>{distEdit} <span className="text-slate-500 text-[10px]">m</span></> : <span className="text-slate-300">수기 입력</span>)}
         </div>
       </div>
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">대지 면적</div>
         <div className="col-span-8 px-2 py-1 flex items-center gap-1">
-          <input type="number" value={landEdit} onChange={e => setLandEdit(e.target.value)}
-            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
-          <span className="text-slate-500 text-[10px]">㎡</span>
+          {editMode ? (
+            <>
+              <input type="number" value={landEdit} onChange={e => setLandEdit(e.target.value)}
+                placeholder="수기 입력" className={inputClass}/>
+              <span className="text-slate-500 text-[10px]">㎡</span>
+            </>
+          ) : (landEdit ? <>{landEdit} <span className="text-slate-500 text-[10px]">㎡</span></> : <span className="text-slate-300">수기 입력</span>)}
         </div>
       </div>
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">기준층 임대면적</div>
-        <div className="col-span-8 px-2 py-1 text-slate-800">{b.baseLease ? `${b.baseLease} 평` : <span className="text-slate-300">-</span>}</div>
+        <div className="col-span-8 px-2 py-1 flex items-center gap-1">
+          {editMode ? (
+            <>
+              <input type="number" value={baseLeaseEdit} onChange={e => setBaseLeaseEdit(e.target.value)}
+                className={inputClass}/>
+              <span className="text-slate-500 text-[10px]">평</span>
+            </>
+          ) : (baseLeaseEdit ? <>{baseLeaseEdit} <span className="text-slate-500 text-[10px]">평</span></> : <span className="text-slate-300">-</span>)}
+        </div>
       </div>
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">기준층 전용면적</div>
-        <div className="col-span-8 px-2 py-1 text-slate-800">{b.baseNet ? `${b.baseNet} 평` : <span className="text-slate-300">-</span>}</div>
+        <div className="col-span-8 px-2 py-1 flex items-center gap-1">
+          {editMode ? (
+            <>
+              <input type="number" value={baseNetEdit} onChange={e => setBaseNetEdit(e.target.value)}
+                className={inputClass}/>
+              <span className="text-slate-500 text-[10px]">평</span>
+            </>
+          ) : (baseNetEdit ? <>{baseNetEdit} <span className="text-slate-500 text-[10px]">평</span></> : <span className="text-slate-300">-</span>)}
+        </div>
       </div>
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">건물 주용도</div>
         <div className="col-span-8 px-2 py-1">
           <select value={useEdit} onChange={e => setUseEdit(e.target.value)}
-            className="w-full bg-transparent text-slate-800 outline-none text-[11px] cursor-pointer">
+            className={`w-full text-[11px] cursor-pointer outline-none ${editMode ? 'bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5' : 'bg-transparent text-slate-800'}`}>
             <option value="">선택</option>
             {USES.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
