@@ -822,6 +822,8 @@ function GenstarMate() {
   const [previousView, setPreviousView]   = useState('map'); // 뒤로가기에서 돌아갈 페이지
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
   const [selectedColdcallId, setSelectedColdcallId] = useState(null);
+  const [selectedDealId, setSelectedDealId] = useState(null);
+  const [selectedContractId, setSelectedContractId] = useState(null);
   const [visitedIds, setVisitedIds]       = useState(new Set());
   const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
 
@@ -1019,11 +1021,19 @@ function GenstarMate() {
             onOpenColdcall={(id) => { setSelectedColdcallId(id); setPreviousView(pageView); setPageView('coldcallDetail'); }}/>
         ) : pageView === 'coldcallDetail' ? (
           <ColdcallDetailPage coldcallId={selectedColdcallId} onBack={() => setPageView(previousView)} />
+        ) : pageView === 'dealsAll' || pageView === 'dealsMy' ? (
+          <DealsPage onlyMy={pageView === 'dealsMy'}
+            onOpenDeal={(id) => { setSelectedDealId(id); setPreviousView(pageView); setPageView('dealDetail'); }}/>
+        ) : pageView === 'dealDetail' ? (
+          <DealDetailPage dealId={selectedDealId} onBack={() => setPageView(previousView)} />
+        ) : pageView === 'contractsAll' || pageView === 'contractsMy' ? (
+          <ContractsPage onlyMy={pageView === 'contractsMy'}
+            onOpenContract={(id) => { setSelectedContractId(id); setPreviousView(pageView); setPageView('contractDetail'); }}/>
+        ) : pageView === 'contractDetail' ? (
+          <ContractDetailPage contractId={selectedContractId} onBack={() => setPageView(previousView)} />
         ) : (
           <WipPage label={({
             contactsAll: '담당자 관리',
-            dealsAll: '전체 딜', dealsMy: 'My 딜',
-            contractsAll: '전체 계약', contractsMy: 'My 계약',
           })[pageView] || '준비중'} />
         )}
       </div>
@@ -1066,8 +1076,8 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
     'companiesAll': '전체 거래처', 'companiesMy': 'My 거래처', 'companyDetail': '전체 거래처',
     'contactsAll': '전체 담당자',
     'coldcallAll': '전체 콜드콜', 'coldcallMy': 'My 콜드콜', 'coldcallDetail': '전체 콜드콜',
-    'dealsAll': '전체 딜', 'dealsMy': 'My 딜',
-    'contractsAll': '전체 계약', 'contractsMy': 'My 계약',
+    'dealsAll': '전체 딜', 'dealsMy': 'My 딜', 'dealDetail': '전체 딜',
+    'contractsAll': '전체 계약', 'contractsMy': 'My 계약', 'contractDetail': '전체 계약',
   };
   const activeChild = PAGE_TO_CHILD[currentPage] || '지도';
 
@@ -4138,6 +4148,757 @@ function ColdcallDetailBody({ c, hideHeader }) {
         ))}
       </div>
     </>
+  );
+}
+
+/* ============================================================
+ * 딜(Deal) 데이터 & 컴포넌트
+ * ============================================================ */
+const DEAL_STATUS_STYLES = {
+  '검토중':   ['#EEEDFE', '#534AB7'],
+  '협의중':   ['#E6F1FB', '#042C53'],
+  '제안완료': ['#FAEEDA', '#633806'],
+  '계약진행': ['#E1F5EE', '#085041'],
+  '완료':     ['#0F6E56', '#FFFFFF'],
+  '무산':     ['#FCEBEB', '#A32D2D'],
+};
+const DEAL_STEPS = ['검토중','협의중','제안완료','계약진행','완료'];
+const DEAL_REGION_PILL = { CBD: ['#f0f0f0','#333'], GBD: ['#EEEDFE','#534AB7'], YBD: ['#E6F1FB','#042C53'], 기타: ['#f5f5f7','#666'] };
+
+const DEALS = [
+  {id:1,co:'삼성SDS(주)',companyId:1,cg:'A',did:'LD-2025-001',st:'협의중',mgr:'김민수',region:'GBD',area:'4,500',expiry:'2025.03.31',expiryType:'확정',b1:'강남구 테헤란로 A빌딩 12층',b2:'서초구 서초대로 B타워',ec:'2025.04.15',gen:'2025.01.15',cc_st:'니즈확인',cc_cnt:3,log:[{d:'2025.02.10',m:'미팅 완료, 테헤란로 A빌딩 우선 검토'},{d:'2025.01.28',m:'1차 제안서 발송, 4,500평 기준'}]},
+  {id:2,co:'롯데액셀러레이터',companyId:5,cg:'A',did:'LD-2025-002',st:'제안완료',mgr:'한소연',region:'GBD',area:'800',expiry:'2025.04.30',expiryType:'확정',b1:'강남구 역삼동 C빌딩 5층',b2:'',ec:'2025.05.01',gen:'2025.01.20',cc_st:'리드전환',cc_cnt:4,log:[{d:'2025.02.08',m:'제안서 발송 완료, 고객 검토중'},{d:'2025.01.30',m:'현장 투어 완료'}]},
+  {id:3,co:'이마트(주)',companyId:12,cg:'A',did:'LD-2025-003',st:'계약진행',mgr:'정대한',region:'CBD',area:'2,800',expiry:'2025.06.30',expiryType:'확정',b1:'광화문 프라임타워 8-10층',b2:'을지로 D빌딩',ec:'2025.07.01',gen:'2025.01.10',cc_st:'리드전환',cc_cnt:3,log:[{d:'2025.02.12',m:'계약서 초안 검토 진행중'},{d:'2025.02.01',m:'최종 조건 협의 완료'}]},
+  {id:4,co:'카카오엔터프라이즈',companyId:2,cg:'A',did:'LD-2025-004',st:'검토중',mgr:'이수진',region:'GBD',area:'3,200',expiry:'2025.07.31',expiryType:'예상',b1:'강남구 삼성동 E타워',b2:'',ec:'2025.08.15',gen:'2025.02.01',cc_st:'재콜예정',cc_cnt:2,log:[{d:'2025.02.05',m:'1차 미팅, 강남 선호 확인'}]},
+  {id:5,co:'신한은행',companyId:9,cg:'A',did:'LD-2025-005',st:'협의중',mgr:'박준호',region:'CBD',area:'4,800',expiry:'2025.12.31',expiryType:'확정',b1:'종로구 세종대로 F빌딩',b2:'중구 을지로 G타워',ec:'2026.01.15',gen:'2025.01.25',cc_st:'통화완료',cc_cnt:1,log:[{d:'2025.02.10',m:'빌딩 2곳 현장 투어 예정'},{d:'2025.01.25',m:'딜 개시, 조건 협의 시작'}]},
+  {id:6,co:'우아한형제들(주)',companyId:7,cg:'C',did:'LD-2025-006',st:'검토중',mgr:'이수진',region:'GBD',area:'2,300',expiry:'2026.06.30',expiryType:'예상',b1:'성동구 성수동 H스퀘어',b2:'',ec:'2026.07.01',gen:'2025.02.05',cc_st:'재콜예정',cc_cnt:2,log:[{d:'2025.02.05',m:'2026년 이전 희망, 강남·성수 검토'}]},
+  {id:7,co:'네이버클라우드(주)',companyId:8,cg:'B',did:'LD-2025-007',st:'협의중',mgr:'김민수',region:'GBD',area:'3,500',expiry:'2026.03.31',expiryType:'예상',b1:'강남구 테헤란로 I빌딩',b2:'서초구 J타워',ec:'2026.04.01',gen:'2025.02.01',cc_st:'통화완료',cc_cnt:1,log:[{d:'2025.02.02',m:'서울 이전 확정, 강남권 협의 시작'}]},
+  {id:8,co:'현대커머셜(주)',companyId:3,cg:'B',did:'LD-2025-008',st:'검토중',mgr:'박준호',region:'YBD',area:'1,800',expiry:'2026.01.31',expiryType:'예상',b1:'영등포구 여의도 K빌딩',b2:'',ec:'2026.02.15',gen:'2025.02.08',cc_st:'통화완료',cc_cnt:2,log:[{d:'2025.02.08',m:'여의도 선호, 면적 1,500~2,000평'}]},
+];
+
+function DealStatusPill({ status }) {
+  const [bg, c] = DEAL_STATUS_STYLES[status] || ['#f2f2f0','#888888'];
+  return <span style={{display:'inline-block',padding:'3px 10px',borderRadius:5,fontSize:11,fontWeight:500,background:bg,color:c}}>{status}</span>;
+}
+function DealRegionPill({ region }) {
+  const [bg, c] = DEAL_REGION_PILL[region] || ['#f5f5f7','#666'];
+  return <span style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:500,background:bg,color:c}}>{region}</span>;
+}
+function ExpiryBadge({ value, type }) {
+  const isCf = type === '확정';
+  return (
+    <span>
+      <span style={{fontWeight:500, color: isCf ? '#1D9E75' : '#BA7517'}}>{value}</span>
+      <span className="ml-1 px-1 py-0.5 text-[9px] font-bold rounded" style={{background: isCf ? '#E1F5EE' : '#FAEEDA', color: isCf ? '#085041' : '#633806'}}>{type}</span>
+    </span>
+  );
+}
+
+function DealsPage({ onlyMy, onOpenDeal }) {
+  const [sort, setSort] = useState('contractDate');
+  const [perPage, setPerPage] = useState(15);
+  const [page, setPage] = useState(1);
+  const [openF, setOpenF] = useState(null);
+  const [filters, setFilters] = useState({
+    company:'', status:[], grade:[], manager:[], region:[],
+    contractDate:['',''], areaRange:['',''], building:'',
+    expDate:['',''], genDate:['',''], coldStatus:[],
+  });
+  const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
+  const toggleArr = (k, v) => setFilters(p => ({ ...p, [k]: p[k].includes(v) ? p[k].filter(x => x !== v) : [...p[k], v] }));
+  const hasV = (k) => {
+    const v = filters[k];
+    if (Array.isArray(v)) {
+      if (v.length === 2 && typeof v[0] === 'string' && (v[0] !== '' || v[1] !== '')) return true;
+      return v.length > 0 && typeof v[0] !== 'string';
+    }
+    return v && v !== '';
+  };
+  const resetAll = () => setFilters({
+    company:'', status:[], grade:[], manager:[], region:[],
+    contractDate:['',''], areaRange:['',''], building:'',
+    expDate:['',''], genDate:['',''], coldStatus:[],
+  });
+  useEffect(() => {
+    const h = (e) => { if (!e.target.closest('.f-btn-wrap')) setOpenF(null); };
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, []);
+  const parseNum = (s) => parseInt(String(s).replace(/[^0-9]/g,'')) || 0;
+  const filtered = useMemo(() => {
+    let arr = DEALS.filter(d => {
+      if (onlyMy && d.mgr !== '김민수' && d.mgr !== '이수진') return false;
+      if (filters.company && !d.co.toLowerCase().includes(filters.company.toLowerCase())) return false;
+      if (filters.status.length > 0 && !filters.status.includes(d.st)) return false;
+      if (filters.grade.length > 0 && !filters.grade.includes(d.cg)) return false;
+      if (filters.manager.length > 0 && !filters.manager.includes(d.mgr)) return false;
+      if (filters.region.length > 0 && !filters.region.includes(d.region)) return false;
+      if (filters.coldStatus.length > 0 && !filters.coldStatus.includes(d.cc_st)) return false;
+      if (filters.building && !(d.b1 + d.b2).toLowerCase().includes(filters.building.toLowerCase())) return false;
+      const a = parseNum(d.area);
+      if (filters.areaRange[0] && a < +filters.areaRange[0]) return false;
+      if (filters.areaRange[1] && a > +filters.areaRange[1]) return false;
+      const ec = d.ec.replace(/\./g, '-');
+      if (filters.contractDate[0] && ec < filters.contractDate[0]) return false;
+      if (filters.contractDate[1] && ec > filters.contractDate[1]) return false;
+      const ex = d.expiry.replace(/\./g, '-');
+      if (filters.expDate[0] && ex < filters.expDate[0]) return false;
+      if (filters.expDate[1] && ex > filters.expDate[1]) return false;
+      const ge = d.gen.replace(/\./g, '-');
+      if (filters.genDate[0] && ge < filters.genDate[0]) return false;
+      if (filters.genDate[1] && ge > filters.genDate[1]) return false;
+      return true;
+    });
+    arr.sort((a, b) => {
+      switch (sort) {
+        case 'expiry': return a.expiry.localeCompare(b.expiry);
+        case 'area': return parseNum(b.area) - parseNum(a.area);
+        case 'grade': return a.cg.localeCompare(b.cg);
+        case 'recent': return b.gen.localeCompare(a.gen);
+        case 'contractDate':
+        default: return a.ec.localeCompare(b.ec);
+      }
+    });
+    return arr;
+  }, [onlyMy, sort, filters]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paged = filtered.slice((page-1)*perPage, page*perPage);
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">💼</div>
+          <h1 className="font-bold text-[15px] text-slate-900">{onlyMy ? 'My 딜' : '전체 딜'}</h1>
+          <span className="text-[11px] text-slate-400">{onlyMy ? '담당 딜 목록' : '영업 파이프라인 현황'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={resetAll} className="px-2.5 py-1.5 text-[11px] text-slate-600 hover:text-indigo-600">↺ 초기화</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">+ 딜 등록</button>
+        </div>
+      </div>
+
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-100">
+        <span className="text-[11px] text-slate-500 font-semibold mr-1">필터</span>
+        <FilterBtn label="🔍 거래처명" k="dl-co" openF={openF} setOpenF={setOpenF} hasValue={hasV('company')}>
+          <input type="text" value={filters.company} onChange={e => updateF('company', e.target.value)}
+            placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="딜 상태" k="dl-st" openF={openF} setOpenF={setOpenF} hasValue={hasV('status')}>
+          <MultiOpts opts={['검토중','협의중','제안완료','계약진행','완료','무산']} selected={filters.status} onToggle={v => toggleArr('status', v)}/>
+        </FilterBtn>
+        {!onlyMy && <FilterBtn label="☆ 거래처 등급" k="dl-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
+          <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="담당 세일즈" k="dl-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('manager')}>
+          <MultiOpts opts={['김민수','이수진','박준호','한소연','정대한']} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
+        </FilterBtn>}
+        <FilterBtn label="권역" k="dl-rg" openF={openF} setOpenF={setOpenF} hasValue={hasV('region')}>
+          <MultiOpts opts={['CBD','GBD','YBD','기타']} selected={filters.region} onToggle={v => toggleArr('region', v)}/>
+        </FilterBtn>
+        {onlyMy && (
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="contractDate">예상 계약일 임박순</option>
+            <option value="expiry">만기일 임박순</option>
+            <option value="area">면적 큰순</option>
+            <option value="recent">최근 생성순</option>
+          </select>
+        )}
+      </div>
+
+      {!onlyMy && (
+        <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
+          <span className="text-[11px] text-slate-300 mr-1">　</span>
+          <FilterBtn label="📅 예상 계약일" k="dl-ec" openF={openF} setOpenF={setOpenF} hasValue={hasV('contractDate')}>
+            <DateRange minVal={filters.contractDate[0]} maxVal={filters.contractDate[1]} onMin={v => updateF('contractDate', [v, filters.contractDate[1]])} onMax={v => updateF('contractDate', [filters.contractDate[0], v])}/>
+          </FilterBtn>
+          <FilterBtn label="예상 면적(평)" k="dl-ar" openF={openF} setOpenF={setOpenF} hasValue={hasV('areaRange')}>
+            <NumRange minVal={filters.areaRange[0]} maxVal={filters.areaRange[1]} onMin={v => updateF('areaRange', [v, filters.areaRange[1]])} onMax={v => updateF('areaRange', [filters.areaRange[0], v])} unit="평"/>
+          </FilterBtn>
+          <FilterBtn label="빌딩명" k="dl-bld" openF={openF} setOpenF={setOpenF} hasValue={hasV('building')}>
+            <input type="text" value={filters.building} onChange={e => updateF('building', e.target.value)}
+              placeholder="빌딩명 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+          </FilterBtn>
+          <FilterBtn label="📅 만기일" k="dl-exp" openF={openF} setOpenF={setOpenF} hasValue={hasV('expDate')}>
+            <DateRange minVal={filters.expDate[0]} maxVal={filters.expDate[1]} onMin={v => updateF('expDate', [v, filters.expDate[1]])} onMax={v => updateF('expDate', [filters.expDate[0], v])}/>
+          </FilterBtn>
+          <FilterBtn label="📅 딜 생성일" k="dl-gd" openF={openF} setOpenF={setOpenF} hasValue={hasV('genDate')}>
+            <DateRange minVal={filters.genDate[0]} maxVal={filters.genDate[1]} onMin={v => updateF('genDate', [v, filters.genDate[1]])} onMax={v => updateF('genDate', [filters.genDate[0], v])}/>
+          </FilterBtn>
+          <FilterBtn label="콜드콜 상태" k="dl-cc" openF={openF} setOpenF={setOpenF} hasValue={hasV('coldStatus')}>
+            <MultiOpts opts={['신규','통화완료','부재','재콜예정','니즈확인','리드전환']} selected={filters.coldStatus} onToggle={v => toggleArr('coldStatus', v)}/>
+          </FilterBtn>
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="contractDate">예상 계약일 임박순</option>
+            <option value="expiry">만기일 임박순</option>
+            <option value="area">면적 큰순</option>
+            <option value="grade">등급 높은순</option>
+            <option value="recent">최근 생성순</option>
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
+        <div className="font-semibold">총 <span className="text-rose-600 font-bold">{filtered.length}</span> 건 · {page}/{totalPages} 페이지</div>
+        <select value={perPage} onChange={e => { setPerPage(+e.target.value); setPage(1); }}
+          className="px-2 py-1 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value={15}>15개씩</option>
+          <option value={30}>30개씩</option>
+          <option value={50}>50개씩</option>
+        </select>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-[11px] bg-white">
+          <thead className="bg-slate-50 sticky top-0 z-10">
+            <tr className="text-slate-500 font-semibold border-b border-slate-200">
+              <th className="px-3 py-2 text-left">거래처명</th>
+              <th className="px-3 py-2 text-left">딜 상태</th>
+              {!onlyMy && <th className="px-3 py-2 text-left">담당자</th>}
+              <th className="px-3 py-2 text-left">권역</th>
+              <th className="px-3 py-2 text-right">예상 면적</th>
+              <th className="px-3 py-2 text-left">만기일</th>
+              <th className="px-3 py-2 text-left">예상 계약일</th>
+              {!onlyMy && <th className="px-3 py-2 text-left">생성일</th>}
+              <th className="px-3 py-2 text-center w-24">상세</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.map(d => (
+              <tr key={d.id} onClick={() => onOpenDeal(d.id)} className="border-b border-slate-100 hover:bg-amber-50/40 cursor-pointer transition">
+                <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><span className="font-semibold text-slate-800">{d.co}</span><span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[d.cg] || GRADE_STYLES.E}`}>{d.cg}</span></div></td>
+                <td className="px-3 py-2.5"><DealStatusPill status={d.st}/></td>
+                {!onlyMy && <td className="px-3 py-2.5 text-slate-600">{d.mgr}</td>}
+                <td className="px-3 py-2.5"><DealRegionPill region={d.region}/></td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{d.area} 평</td>
+                <td className="px-3 py-2.5 tabular-nums"><ExpiryBadge value={d.expiry} type={d.expiryType}/></td>
+                <td className="px-3 py-2.5 text-slate-500 tabular-nums">{d.ec}</td>
+                {!onlyMy && <td className="px-3 py-2.5 text-slate-500 tabular-nums">{d.gen}</td>}
+                <td className="px-3 py-2.5 text-center">
+                  <button onClick={e => { e.stopPropagation(); onOpenDeal(d.id); }}
+                    className="px-3 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">상세 보기</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between text-[10px] flex-shrink-0">
+        <div className="flex gap-1.5 flex-wrap">
+          {Object.entries(DEAL_STATUS_STYLES).map(([k, [bg, c]]) => (
+            <span key={k} style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:10,fontWeight:500,background:bg,color:c}}>{k}</span>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 text-[11px]">
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="px-2 py-0.5 disabled:opacity-30">‹</button>
+          {Array.from({length: totalPages}).map((_, i) => (
+            <button key={i} onClick={() => setPage(i+1)} className={`px-2 py-0.5 rounded ${page === i+1 ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-100'}`}>{i+1}</button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="px-2 py-0.5 disabled:opacity-30">›</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DealDetailPage({ dealId, onBack }) {
+  const d = DEALS.find(x => x.id === dealId);
+  if (!d) return <div className="flex-1 flex items-center justify-center text-slate-400">딜 정보를 찾을 수 없습니다</div>;
+  const stepIdx = DEAL_STEPS.indexOf(d.st);
+  return (
+    <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 text-[12px] font-semibold">
+            <ChevronLeft size={14} /> 뒤로 가기
+          </button>
+          <div className="h-4 w-px bg-slate-200" />
+          <span className="text-[10px] text-slate-500 font-mono">{d.did}</span>
+          <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${GRADE_STYLES[d.cg]}`}>{d.cg}</span>
+          <h1 className="font-bold text-[16px] text-slate-900">{d.co}</h1>
+          <DealStatusPill status={d.st}/>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">수정</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-emerald-600 text-white rounded hover:bg-emerald-700">계약 진행 ↗</button>
+        </div>
+      </div>
+      <div className="p-5">
+        <DealDetailBody d={d} stepIdx={stepIdx} />
+      </div>
+    </div>
+  );
+}
+
+function DealDetailBody({ d, stepIdx, hideHeader }) {
+  const [memoInput, setMemoInput] = useState('');
+  const [addedMemos, setAddedMemos] = useState([]);
+  const addMemo = () => {
+    if (!memoInput.trim()) return;
+    const now = new Date();
+    const dt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    setAddedMemos(prev => [{ d: dt, t: memoInput }, ...prev]);
+    setMemoInput('');
+  };
+  const KV = ({ k, v, tone }) => (
+    <React.Fragment>
+      <div className="bg-slate-50 px-3 py-2 text-[11px] text-slate-500 border-r border-b border-slate-100">{k}</div>
+      <div className={`px-3 py-2 text-[12px] font-semibold border-r border-b border-slate-100 ${tone === 'g' ? 'text-emerald-600' : tone === 'w' ? 'text-amber-600' : 'text-slate-800'}`}>{v}</div>
+    </React.Fragment>
+  );
+  const buildings = [d.b1, d.b2].filter(Boolean);
+  return (
+    <>
+      {!hideHeader && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          {/* Progress stepper */}
+          <div className="flex items-center gap-1.5 mb-4">
+            {DEAL_STEPS.map((s, i) => (
+              <React.Fragment key={s}>
+                <div className={`flex-1 text-center px-2 py-1.5 rounded text-[10px] font-semibold ${
+                  i < stepIdx ? 'bg-emerald-100 text-emerald-700' :
+                  i === stepIdx ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'
+                }`}>{s}</div>
+                {i < DEAL_STEPS.length - 1 && <span className="text-slate-300">›</span>}
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-white border border-amber-200 rounded-lg px-3 py-2"><div className="text-[10px] text-amber-700 font-semibold">예상 면적</div><div className="text-[14px] font-bold mt-0.5 text-amber-900">{d.area} 평</div></div>
+            <div className="bg-white border border-amber-200 rounded-lg px-3 py-2"><div className="text-[10px] text-amber-700 font-semibold">만기일</div><div className={`text-[14px] font-bold mt-0.5 ${d.expiryType === '확정' ? 'text-emerald-600' : 'text-amber-600'}`}>{d.expiry}<span className="ml-1 px-1 py-0.5 text-[9px] font-bold rounded" style={{background: d.expiryType === '확정' ? '#E1F5EE' : '#FAEEDA', color: d.expiryType === '확정' ? '#085041' : '#633806'}}>{d.expiryType}</span></div></div>
+            <div className="bg-white border border-amber-200 rounded-lg px-3 py-2"><div className="text-[10px] text-amber-700 font-semibold">예상 계약일</div><div className="text-[14px] font-bold mt-0.5 text-amber-900">{d.ec}</div></div>
+            <div className="bg-white border border-amber-200 rounded-lg px-3 py-2"><div className="text-[10px] text-amber-700 font-semibold">콜드콜 상태</div><div className="text-[12px] font-bold mt-0.5 text-amber-900">{d.cc_st} · {d.cc_cnt}회</div></div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-amber-50 text-amber-900">💼 딜 기본 정보</div>
+      <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+        <KV k="딜 ID" v={d.did}/>
+        <KV k="딜 상태" v={<DealStatusPill status={d.st}/>}/>
+        <KV k="담당 세일즈" v={d.mgr}/>
+        <KV k="권역" v={<DealRegionPill region={d.region}/>}/>
+        <KV k="예상 면적" v={`${d.area} 평`}/>
+        <KV k="예상 계약일" v={d.ec}/>
+        <KV k="딜 생성일" v={d.gen}/>
+        <KV k="" v=""/>
+      </div>
+
+      <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-sky-50 text-sky-900">🏢 거래처 연결 정보</div>
+      <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+        <KV k="거래처명" v={d.co}/>
+        <KV k="거래처 등급" v={<span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[d.cg]}`}>{d.cg}</span>}/>
+        <KV k="만기일" v={`${d.expiry} (${d.expiryType})`} tone={d.expiryType === '확정' ? 'g' : 'w'}/>
+        <KV k="콜드콜 상태" v={`${d.cc_st} · ${d.cc_cnt}회`}/>
+      </div>
+
+      <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-emerald-50 text-emerald-900">🏬 빌딩 후보</div>
+      {buildings.length === 0 ? (
+        <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">등록된 빌딩 후보가 없습니다</div>
+      ) : (
+        <div className="space-y-2">
+          {buildings.map((b, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white">
+              <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px] font-bold">B{i+1}</div>
+              <div className="flex-1 text-[13px] font-semibold">{b}</div>
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${i === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{i === 0 ? '1순위' : '2순위'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-slate-100 text-slate-700">📝 딜 활동 기록</div>
+      <div className="border border-indigo-200 rounded-lg overflow-hidden mb-3">
+        <div className="bg-indigo-50 px-3 py-2 text-[11px] font-semibold text-indigo-900 border-b border-indigo-200">✏️ 메모 직접 입력</div>
+        {addedMemos.map((m, i) => (
+          <div key={i} className="px-3 py-2 text-[12px] border-b border-slate-100 last:border-0 bg-white">
+            <span className="text-[10px] text-slate-400">{m.d}</span>
+            <div className="mt-0.5">{m.t}</div>
+          </div>
+        ))}
+        <textarea value={memoInput} onChange={e => setMemoInput(e.target.value)} rows={2}
+          placeholder="딜 활동 메모를 입력하세요..."
+          className="w-full px-3 py-2 text-[12px] outline-none resize-none"/>
+        <div className="flex justify-end px-3 py-1.5 bg-slate-50 border-t border-slate-100">
+          <button onClick={addMemo} className="px-3 py-1 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">메모 추가</button>
+        </div>
+      </div>
+      <div className="border border-slate-200 rounded-lg px-4">
+        {d.log.map((x, i) => (
+          <div key={i} className="flex gap-2 py-2.5 border-b border-slate-100 last:border-0">
+            <span className="w-2 h-2 rounded-full mt-1.5 bg-amber-500"/>
+            <div className="flex-1">
+              <div className="text-[10px] text-slate-500 mb-0.5">{x.d}</div>
+              <div className="text-[12px]">{x.m}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ============================================================
+ * 계약(Contract) 데이터 & 컴포넌트
+ * ============================================================ */
+const CONTRACT_STATUS_STYLES = {
+  '계약 완료': ['#E1F5EE', '#085041'],
+  '입주 예정': ['#E6F1FB', '#042C53'],
+  '입주 완료': ['#0F6E56', '#FFFFFF'],
+  '계약 해지': ['#FCEBEB', '#A32D2D'],
+  '갱신 협의': ['#FFF9E6', '#856404'],
+};
+const CONTRACT_TYPE_STYLES = {
+  '신규':     ['#EEEDFE', '#534AB7'],
+  '갱신':     ['#E1F5EE', '#085041'],
+  '확장 이전':['#FAEEDA', '#633806'],
+};
+
+const CONTRACTS = [
+  {id:1,co:'이마트(주)',companyId:12,cg:'A',cid:'CT-2025-001',did:'LD-2025-003',st:'계약 완료',mgr:'정대한',region:'CBD',area:'2,800',bld:'광화문 프라임타워 8-10층',floor:'8~10층',start:'2025.08.01',end:'2030.07.31',deposit:'95억 원',rent:'2,800만 원/월',mgmt:'320만 원/월',type:'확장 이전',gen:'2025.02.15',rentNum:2800,log:[{d:'2025.02.15',m:'계약서 최종 서명 완료'},{d:'2025.02.10',m:'계약 조건 최종 합의'},{d:'2025.01.30',m:'법인 검토 완료, 서명 준비'}]},
+  {id:2,co:'롯데액셀러레이터',companyId:5,cg:'A',cid:'CT-2025-002',did:'LD-2025-002',st:'입주 예정',mgr:'한소연',region:'GBD',area:'800',bld:'강남구 역삼동 C빌딩 5층',floor:'5층',start:'2025.06.01',end:'2028.05.31',deposit:'22억 원',rent:'500만 원/월',mgmt:'60만 원/월',type:'확장 이전',gen:'2025.02.10',rentNum:500,log:[{d:'2025.02.10',m:'계약 체결 완료, 입주 준비 중'},{d:'2025.02.05',m:'임대차 계약서 서명'}]},
+  {id:3,co:'삼성SDS(주)',companyId:1,cg:'A',cid:'CT-2025-003',did:'LD-2025-001',st:'입주 예정',mgr:'김민수',region:'GBD',area:'4,500',bld:'강남구 테헤란로 A빌딩 12층',floor:'12~15층',start:'2025.05.01',end:'2030.04.30',deposit:'135억 원',rent:'4,200만 원/월',mgmt:'480만 원/월',type:'신규',gen:'2025.02.12',rentNum:4200,log:[{d:'2025.02.12',m:'계약서 서명 완료, 인테리어 착공'},{d:'2025.02.08',m:'최종 조건 합의 완료'}]},
+  {id:4,co:'신한은행',companyId:9,cg:'A',cid:'CT-2024-018',did:'-',st:'갱신 협의',mgr:'박준호',region:'CBD',area:'4,800',bld:'신한은행 본점',floor:'2~8층',start:'2026.01.01',end:'2031.12.31',deposit:'200억 원',rent:'6,100만 원/월',mgmt:'720만 원/월',type:'갱신',gen:'2024.11.01',rentNum:6100,log:[{d:'2025.01.20',m:'갱신 조건 협의 진행중'},{d:'2024.12.15',m:'갱신 의사 확인, 협의 시작'}]},
+  {id:5,co:'한화생명',companyId:13,cg:'C',cid:'CT-2023-007',did:'-',st:'입주 완료',mgr:'이수진',region:'YBD',area:'3,600',bld:'한화생명 63빌딩',floor:'15~22층',start:'2024.01.01',end:'2029.12.31',deposit:'130억 원',rent:'4,200만 원/월',mgmt:'500만 원/월',type:'갱신',gen:'2023.11.15',rentNum:4200,log:[{d:'2024.01.02',m:'입주 완료, 정상 운영'},{d:'2023.12.28',m:'이사 완료 확인'}]},
+  {id:6,co:'KT DS(주)',companyId:14,cg:'B',cid:'CT-2025-004',did:'LD-2025-007',st:'계약 완료',mgr:'김민수',region:'GBD',area:'1,100',bld:'강남구 테헤란로 I빌딩',floor:'3~4층',start:'2026.01.01',end:'2029.12.31',deposit:'33억 원',rent:'960만 원/월',mgmt:'110만 원/월',type:'신규',gen:'2025.02.18',rentNum:960,log:[{d:'2025.02.18',m:'계약서 서명 완료'},{d:'2025.02.14',m:'최종 조건 합의'}]},
+];
+
+function ContractStatusPill({ status }) {
+  const [bg, c] = CONTRACT_STATUS_STYLES[status] || ['#f2f2f0','#888'];
+  return <span style={{display:'inline-block',padding:'3px 10px',borderRadius:5,fontSize:11,fontWeight:500,background:bg,color:c}}>{status}</span>;
+}
+function ContractTypePill({ type }) {
+  const [bg, c] = CONTRACT_TYPE_STYLES[type] || ['#f5f5f7','#666'];
+  return <span style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:500,background:bg,color:c}}>{type}</span>;
+}
+
+function ContractsPage({ onlyMy, onOpenContract }) {
+  const [sort, setSort] = useState('endDate');
+  const [perPage, setPerPage] = useState(15);
+  const [page, setPage] = useState(1);
+  const [openF, setOpenF] = useState(null);
+  const [filters, setFilters] = useState({
+    company:'', status:[], grade:[], manager:[], region:[], cType:[],
+    startDate:['',''], endDate:['',''], areaRange:['',''], building:'', dealId:'', rentRange:['',''],
+  });
+  const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
+  const toggleArr = (k, v) => setFilters(p => ({ ...p, [k]: p[k].includes(v) ? p[k].filter(x => x !== v) : [...p[k], v] }));
+  const hasV = (k) => {
+    const v = filters[k];
+    if (Array.isArray(v)) {
+      if (v.length === 2 && typeof v[0] === 'string' && (v[0] !== '' || v[1] !== '')) return true;
+      return v.length > 0 && typeof v[0] !== 'string';
+    }
+    return v && v !== '';
+  };
+  const resetAll = () => setFilters({
+    company:'', status:[], grade:[], manager:[], region:[], cType:[],
+    startDate:['',''], endDate:['',''], areaRange:['',''], building:'', dealId:'', rentRange:['',''],
+  });
+  useEffect(() => {
+    const h = (e) => { if (!e.target.closest('.f-btn-wrap')) setOpenF(null); };
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, []);
+  const parseNum = (s) => parseInt(String(s).replace(/[^0-9]/g,'')) || 0;
+
+  const filtered = useMemo(() => {
+    let arr = CONTRACTS.filter(c => {
+      if (onlyMy && c.mgr !== '김민수' && c.mgr !== '이수진') return false;
+      if (filters.company && !c.co.toLowerCase().includes(filters.company.toLowerCase())) return false;
+      if (filters.status.length > 0 && !filters.status.includes(c.st)) return false;
+      if (filters.grade.length > 0 && !filters.grade.includes(c.cg)) return false;
+      if (filters.manager.length > 0 && !filters.manager.includes(c.mgr)) return false;
+      if (filters.region.length > 0 && !filters.region.includes(c.region)) return false;
+      if (filters.cType.length > 0 && !filters.cType.includes(c.type)) return false;
+      if (filters.building && !c.bld.toLowerCase().includes(filters.building.toLowerCase())) return false;
+      if (filters.dealId && !c.did.toLowerCase().includes(filters.dealId.toLowerCase())) return false;
+      const a = parseNum(c.area);
+      if (filters.areaRange[0] && a < +filters.areaRange[0]) return false;
+      if (filters.areaRange[1] && a > +filters.areaRange[1]) return false;
+      if (filters.rentRange[0] && c.rentNum < +filters.rentRange[0]) return false;
+      if (filters.rentRange[1] && c.rentNum > +filters.rentRange[1]) return false;
+      const s = c.start.replace(/\./g, '-'), e = c.end.replace(/\./g, '-');
+      if (filters.startDate[0] && s < filters.startDate[0]) return false;
+      if (filters.startDate[1] && s > filters.startDate[1]) return false;
+      if (filters.endDate[0] && e < filters.endDate[0]) return false;
+      if (filters.endDate[1] && e > filters.endDate[1]) return false;
+      return true;
+    });
+    arr.sort((a, b) => {
+      switch (sort) {
+        case 'startDate': return b.start.localeCompare(a.start);
+        case 'area': return parseNum(b.area) - parseNum(a.area);
+        case 'grade': return a.cg.localeCompare(b.cg);
+        case 'recent': return b.gen.localeCompare(a.gen);
+        case 'endDate':
+        default: return a.end.localeCompare(b.end);
+      }
+    });
+    return arr;
+  }, [onlyMy, sort, filters]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paged = filtered.slice((page-1)*perPage, page*perPage);
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">📄</div>
+          <h1 className="font-bold text-[15px] text-slate-900">{onlyMy ? 'My 계약' : '전체 계약'}</h1>
+          <span className="text-[11px] text-slate-400">{onlyMy ? '담당 계약 목록' : '계약 관리 현황'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={resetAll} className="px-2.5 py-1.5 text-[11px] text-slate-600 hover:text-indigo-600">↺ 초기화</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">+ 계약 등록</button>
+        </div>
+      </div>
+
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-100">
+        <span className="text-[11px] text-slate-500 font-semibold mr-1">필터</span>
+        <FilterBtn label="🔍 거래처명" k="ct-co" openF={openF} setOpenF={setOpenF} hasValue={hasV('company')}>
+          <input type="text" value={filters.company} onChange={e => updateF('company', e.target.value)}
+            placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="계약 상태" k="ct-st" openF={openF} setOpenF={setOpenF} hasValue={hasV('status')}>
+          <MultiOpts opts={['계약 완료','입주 예정','입주 완료','계약 해지','갱신 협의']} selected={filters.status} onToggle={v => toggleArr('status', v)}/>
+        </FilterBtn>
+        {!onlyMy && <FilterBtn label="☆ 거래처 등급" k="ct-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
+          <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="담당 세일즈" k="ct-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('manager')}>
+          <MultiOpts opts={['김민수','이수진','박준호','한소연','정대한']} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
+        </FilterBtn>}
+        <FilterBtn label="권역" k="ct-rg" openF={openF} setOpenF={setOpenF} hasValue={hasV('region')}>
+          <MultiOpts opts={['CBD','GBD','YBD','기타']} selected={filters.region} onToggle={v => toggleArr('region', v)}/>
+        </FilterBtn>
+        <FilterBtn label="계약 유형" k="ct-tp" openF={openF} setOpenF={setOpenF} hasValue={hasV('cType')}>
+          <MultiOpts opts={['신규','갱신','확장 이전']} selected={filters.cType} onToggle={v => toggleArr('cType', v)}/>
+        </FilterBtn>
+        {onlyMy && (
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="endDate">계약 종료일 임박순</option>
+            <option value="startDate">계약 시작일순</option>
+            <option value="area">면적 큰순</option>
+            <option value="recent">최근 생성순</option>
+          </select>
+        )}
+      </div>
+
+      {!onlyMy && (
+        <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
+          <span className="text-[11px] text-slate-300 mr-1">　</span>
+          <FilterBtn label="📅 계약 시작일" k="ct-ss" openF={openF} setOpenF={setOpenF} hasValue={hasV('startDate')}>
+            <DateRange minVal={filters.startDate[0]} maxVal={filters.startDate[1]} onMin={v => updateF('startDate', [v, filters.startDate[1]])} onMax={v => updateF('startDate', [filters.startDate[0], v])}/>
+          </FilterBtn>
+          <FilterBtn label="📅 계약 종료일" k="ct-se" openF={openF} setOpenF={setOpenF} hasValue={hasV('endDate')}>
+            <DateRange minVal={filters.endDate[0]} maxVal={filters.endDate[1]} onMin={v => updateF('endDate', [v, filters.endDate[1]])} onMax={v => updateF('endDate', [filters.endDate[0], v])}/>
+          </FilterBtn>
+          <FilterBtn label="계약 면적(평)" k="ct-ar" openF={openF} setOpenF={setOpenF} hasValue={hasV('areaRange')}>
+            <NumRange minVal={filters.areaRange[0]} maxVal={filters.areaRange[1]} onMin={v => updateF('areaRange', [v, filters.areaRange[1]])} onMax={v => updateF('areaRange', [filters.areaRange[0], v])} unit="평"/>
+          </FilterBtn>
+          <FilterBtn label="빌딩명" k="ct-bld" openF={openF} setOpenF={setOpenF} hasValue={hasV('building')}>
+            <input type="text" value={filters.building} onChange={e => updateF('building', e.target.value)}
+              placeholder="빌딩명 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+          </FilterBtn>
+          <FilterBtn label="딜 ID" k="ct-did" openF={openF} setOpenF={setOpenF} hasValue={hasV('dealId')}>
+            <input type="text" value={filters.dealId} onChange={e => updateF('dealId', e.target.value)}
+              placeholder="LD-2025-..." className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+          </FilterBtn>
+          <FilterBtn label="월 임대료(만원)" k="ct-rent" openF={openF} setOpenF={setOpenF} hasValue={hasV('rentRange')}>
+            <NumRange minVal={filters.rentRange[0]} maxVal={filters.rentRange[1]} onMin={v => updateF('rentRange', [v, filters.rentRange[1]])} onMax={v => updateF('rentRange', [filters.rentRange[0], v])} unit="만원"/>
+          </FilterBtn>
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="endDate">계약 종료일 임박순</option>
+            <option value="startDate">계약 시작일순</option>
+            <option value="area">면적 큰순</option>
+            <option value="grade">등급 높은순</option>
+            <option value="recent">최근 생성순</option>
+          </select>
+        </div>
+      )}
+
+      <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
+        <div className="font-semibold">총 <span className="text-rose-600 font-bold">{filtered.length}</span> 건 · {page}/{totalPages} 페이지</div>
+        <select value={perPage} onChange={e => { setPerPage(+e.target.value); setPage(1); }}
+          className="px-2 py-1 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value={15}>15개씩</option>
+          <option value={30}>30개씩</option>
+          <option value={50}>50개씩</option>
+        </select>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-[11px] bg-white">
+          <thead className="bg-slate-50 sticky top-0 z-10">
+            <tr className="text-slate-500 font-semibold border-b border-slate-200">
+              <th className="px-3 py-2 text-left">거래처명</th>
+              <th className="px-3 py-2 text-left">계약 상태</th>
+              {!onlyMy && <th className="px-3 py-2 text-left">담당자</th>}
+              <th className="px-3 py-2 text-left">권역</th>
+              <th className="px-3 py-2 text-right">계약 면적</th>
+              <th className="px-3 py-2 text-left">빌딩명</th>
+              <th className="px-3 py-2 text-left">계약 시작</th>
+              <th className="px-3 py-2 text-left">계약 종료</th>
+              {!onlyMy && <th className="px-3 py-2 text-left">유형</th>}
+              <th className="px-3 py-2 text-center w-24">상세</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.map(c => (
+              <tr key={c.id} onClick={() => onOpenContract(c.id)} className="border-b border-slate-100 hover:bg-emerald-50/40 cursor-pointer transition">
+                <td className="px-3 py-2.5"><div className="flex items-center gap-1.5"><span className="font-semibold text-slate-800">{c.co}</span><span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.cg] || GRADE_STYLES.E}`}>{c.cg}</span></div></td>
+                <td className="px-3 py-2.5"><ContractStatusPill status={c.st}/></td>
+                {!onlyMy && <td className="px-3 py-2.5 text-slate-600">{c.mgr}</td>}
+                <td className="px-3 py-2.5"><DealRegionPill region={c.region}/></td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{c.area} 평</td>
+                <td className="px-3 py-2.5 text-slate-600 truncate" title={c.bld}>{c.bld}</td>
+                <td className="px-3 py-2.5 text-slate-500 tabular-nums">{c.start}</td>
+                <td className="px-3 py-2.5 text-slate-500 tabular-nums">{c.end}</td>
+                {!onlyMy && <td className="px-3 py-2.5"><ContractTypePill type={c.type}/></td>}
+                <td className="px-3 py-2.5 text-center">
+                  <button onClick={e => { e.stopPropagation(); onOpenContract(c.id); }}
+                    className="px-3 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">상세 보기</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between text-[10px] flex-shrink-0">
+        <div className="flex gap-1.5 flex-wrap">
+          {Object.entries(CONTRACT_STATUS_STYLES).map(([k, [bg, c]]) => (
+            <span key={k} style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:10,fontWeight:500,background:bg,color:c}}>{k}</span>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 text-[11px]">
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="px-2 py-0.5 disabled:opacity-30">‹</button>
+          {Array.from({length: totalPages}).map((_, i) => (
+            <button key={i} onClick={() => setPage(i+1)} className={`px-2 py-0.5 rounded ${page === i+1 ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-100'}`}>{i+1}</button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="px-2 py-0.5 disabled:opacity-30">›</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContractDetailPage({ contractId, onBack }) {
+  const c = CONTRACTS.find(x => x.id === contractId);
+  if (!c) return <div className="flex-1 flex items-center justify-center text-slate-400">계약 정보를 찾을 수 없습니다</div>;
+  const [memoInput, setMemoInput] = useState('');
+  const [addedMemos, setAddedMemos] = useState([]);
+  const addMemo = () => {
+    if (!memoInput.trim()) return;
+    const now = new Date();
+    const dt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    setAddedMemos(prev => [{ d: dt, t: memoInput }, ...prev]);
+    setMemoInput('');
+  };
+  const KV = ({ k, v, tone }) => (
+    <React.Fragment>
+      <div className="bg-slate-50 px-3 py-2 text-[11px] text-slate-500 border-r border-b border-slate-100">{k}</div>
+      <div className={`px-3 py-2 text-[12px] font-semibold border-r border-b border-slate-100 ${tone === 'g' ? 'text-emerald-600' : tone === 'w' ? 'text-amber-600' : 'text-slate-800'}`}>{v}</div>
+    </React.Fragment>
+  );
+
+  return (
+    <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 text-[12px] font-semibold">
+            <ChevronLeft size={14} /> 뒤로 가기
+          </button>
+          <div className="h-4 w-px bg-slate-200" />
+          <span className="text-[10px] text-slate-500 font-mono">{c.cid}</span>
+          <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${GRADE_STYLES[c.cg]}`}>{c.cg}</span>
+          <h1 className="font-bold text-[16px] text-slate-900">{c.co}</h1>
+          <ContractStatusPill status={c.st}/>
+          <ContractTypePill type={c.type}/>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">수정</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-emerald-600 text-white rounded hover:bg-emerald-700">✓ 계약 관리</button>
+        </div>
+      </div>
+
+      <div className="p-5">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2"><div className="text-[10px] text-emerald-700 font-semibold">계약 면적</div><div className="text-[14px] font-bold mt-0.5 text-emerald-600">{c.area} 평</div></div>
+            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2"><div className="text-[10px] text-emerald-700 font-semibold">계약 기간</div><div className="text-[11px] font-bold mt-0.5 text-emerald-900">{c.start} ~ {c.end}</div></div>
+            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2"><div className="text-[10px] text-emerald-700 font-semibold">월 임대료</div><div className="text-[14px] font-bold mt-0.5 text-emerald-900">{c.rent}</div></div>
+            <div className="bg-white border border-emerald-200 rounded-lg px-3 py-2"><div className="text-[10px] text-emerald-700 font-semibold">보증금</div><div className="text-[14px] font-bold mt-0.5 text-emerald-900">{c.deposit}</div></div>
+          </div>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-emerald-50 text-emerald-900">📄 계약 기본 정보</div>
+        <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+          <KV k="계약 ID" v={c.cid}/>
+          <KV k="계약 상태" v={<ContractStatusPill status={c.st}/>}/>
+          <KV k="계약 유형" v={<ContractTypePill type={c.type}/>}/>
+          <KV k="담당 세일즈" v={c.mgr}/>
+          <KV k="계약 시작일" v={c.start} tone="g"/>
+          <KV k="계약 종료일" v={c.end}/>
+          <KV k="계약 면적" v={`${c.area} 평`} tone="g"/>
+          <KV k="권역" v={<DealRegionPill region={c.region}/>}/>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-amber-50 text-amber-900">🏢 임대 상세 정보</div>
+        <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+          <KV k="빌딩명" v={c.bld}/>
+          <KV k="층/호수" v={c.floor}/>
+          <KV k="보증금" v={c.deposit}/>
+          <KV k="월 임대료" v={c.rent}/>
+          <KV k="관리비" v={c.mgmt}/>
+          <KV k="" v=""/>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-sky-50 text-sky-900">🔗 연결 정보</div>
+        <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+          <KV k="거래처명" v={c.co}/>
+          <KV k="거래처 등급" v={<span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.cg]}`}>{c.cg}</span>}/>
+          <KV k="딜 ID" v={c.did !== '-' ? c.did : '직접 갱신'}/>
+          <KV k="생성일" v={c.gen}/>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-slate-100 text-slate-700">📝 계약 활동 기록</div>
+        <div className="border border-indigo-200 rounded-lg overflow-hidden mb-3">
+          <div className="bg-indigo-50 px-3 py-2 text-[11px] font-semibold text-indigo-900 border-b border-indigo-200">✏️ 메모 직접 입력</div>
+          {addedMemos.map((m, i) => (
+            <div key={i} className="px-3 py-2 text-[12px] border-b border-slate-100 last:border-0 bg-white">
+              <span className="text-[10px] text-slate-400">{m.d}</span>
+              <div className="mt-0.5">{m.t}</div>
+            </div>
+          ))}
+          <textarea value={memoInput} onChange={e => setMemoInput(e.target.value)} rows={2}
+            placeholder="계약 활동 메모를 입력하세요..."
+            className="w-full px-3 py-2 text-[12px] outline-none resize-none"/>
+          <div className="flex justify-end px-3 py-1.5 bg-slate-50 border-t border-slate-100">
+            <button onClick={addMemo} className="px-3 py-1 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">메모 추가</button>
+          </div>
+        </div>
+        <div className="border border-slate-200 rounded-lg px-4">
+          {c.log.map((x, i) => (
+            <div key={i} className="flex gap-2 py-2.5 border-b border-slate-100 last:border-0">
+              <span className="w-2 h-2 rounded-full mt-1.5 bg-emerald-500"/>
+              <div className="flex-1">
+                <div className="text-[10px] text-slate-500 mb-0.5">{x.d}</div>
+                <div className="text-[12px]">{x.m}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
