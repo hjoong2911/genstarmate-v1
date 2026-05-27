@@ -1183,6 +1183,11 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
               <span className="ml-0.5 px-1.5 py-0 text-[10px] font-bold bg-indigo-600 text-white rounded-full">{cartCount}</span>
             )}
           </button>
+          {pageView === 'allBuildings' && (
+            <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-1 shadow-sm">
+              <Plus size={12} /> 빌딩 등록
+            </button>
+          )}
         </div>
       </div>
 
@@ -2693,8 +2698,10 @@ function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart
  * AllBuildingsPage - 전체 빌딩 리스트 페이지
  * ============================================================ */
 function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart }) {
-  const [sort, setSort] = useState('area');              // area | vacancy | base | noc | name
+  const [sort, setSort] = useState('area');
   const [starred, setStarred] = useState(new Set());
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(15);
 
   const toggleStar = (id) => {
     setStarred(prev => {
@@ -2722,17 +2729,27 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
   }, [buildings, sort]);
 
   const filtered = sorted;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paged = filtered.slice((page-1)*perPage, page*perPage);
+
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
 
   const isInCartAny = (b) => b.vacancies.some(v => cart.some(item => item.id === `${b.id}-${v.floor}`));
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
-      {/* 헤더 (총 N개, 정렬, 신규 등록 / 빌딩 등록) */}
+      {/* 헤더 (총 N개 · X/Y 페이지 + 정렬 + 페이지당) */}
       <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <div className="text-[12px] font-semibold text-slate-700">
-          총 <span className="text-rose-600 font-bold">{filtered.length}</span> 개
+          총 <span className="text-rose-600 font-bold">{filtered.length}</span> 개 · {page}/{totalPages} 페이지
         </div>
         <div className="flex items-center gap-2">
+          <select value={perPage} onChange={e => { setPerPage(+e.target.value); setPage(1); }}
+            className="px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value={15}>15개씩</option>
+            <option value={30}>30개씩</option>
+            <option value={50}>50개씩</option>
+          </select>
           <select value={sort} onChange={e => setSort(e.target.value)}
             className="px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
             <option value="area">연면적 순</option>
@@ -2741,9 +2758,6 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
             <option value="noc">기준층 NOC 순</option>
             <option value="name">빌딩명 (가나다)</option>
           </select>
-          <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1">
-            <Plus size={12} /> 빌딩 등록
-          </button>
         </div>
       </div>
 
@@ -2767,7 +2781,7 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
             {filtered.length === 0 ? (
               <tr><td colSpan="9" className="text-center text-slate-400 py-12 text-[12px]">조건에 맞는 빌딩이 없습니다</td></tr>
             ) : (
-              filtered.map(b => {
+              paged.map(b => {
                 const vacSum = sumVacArea(b);
                 const isStar = starred.has(b.id);
                 const inCart = isInCartAny(b);
@@ -2818,6 +2832,20 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
           </tbody>
         </table>
       </div>
+
+      {/* 페이지네이션 (전체 거래처와 동일 스타일) */}
+      <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-end text-[11px] flex-shrink-0">
+        <div className="flex items-center gap-1">
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+            className="px-2 py-0.5 disabled:opacity-30">‹</button>
+          {Array.from({length: totalPages}).map((_, i) => (
+            <button key={i} onClick={() => setPage(i+1)}
+              className={`px-2 py-0.5 rounded ${page === i+1 ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-100'}`}>{i+1}</button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+            className="px-2 py-0.5 disabled:opacity-30">›</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2860,7 +2888,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
   const [coldcallSet, setColdcallSet] = useState(new Set());
   const [starred, setStarred] = useState(new Set());
   const [page, setPage] = useState(1);
-  const PER = 12;
+  const [perPage, setPerPage] = useState(15);
 
   // 필터 상태
   const [filters, setFilters] = useState({
@@ -2884,6 +2912,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
     phone: 'all',    // 핸드폰 유무
     email: 'all',    // 이메일 유무
     tel: 'all',      // 회사번호 유무
+    salesManager: [],  // 세일즈 담당자
   });
   const [openF, setOpenF] = useState(null);
 
@@ -2905,7 +2934,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
     name: '', address: '', bizType: [], classCat: [], grade: [], nation: 'all', site: 'all',
     branch: 'all', contract: 'all', expiryType: 'all', expDateMin: '', expDateMax: '',
     cfDateMin: '', cfDateMax: '', expAreaMin: '', expAreaMax: '', cfAreaMin: '', cfAreaMax: '',
-    deal: 'all', inactive: 'all', inactiveReason: [], manager: 'all', phone: 'all', email: 'all', tel: 'all',
+    deal: 'all', inactive: 'all', inactiveReason: [], manager: 'all', phone: 'all', email: 'all', tel: 'all', salesManager: [],
   });
 
   // 외부 클릭으로 dropdown 닫기
@@ -2965,6 +2994,8 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
       if (filters.phone !== 'all' && c.폰 !== filters.phone) return false;
       if (filters.email !== 'all' && c.메 !== filters.email) return false;
       if (filters.tel !== 'all' && c.회 !== filters.tel) return false;
+      // 세일즈 담당자 (다중)
+      if (filters.salesManager.length > 0 && !filters.salesManager.includes(c.담)) return false;
       return true;
     });
 
@@ -2989,8 +3020,8 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
     return arr;
   }, [onlyMy, sort, filters]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
-  const paged = filtered.slice((page-1)*PER, page*PER);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paged = filtered.slice((page-1)*perPage, page*perPage);
 
   // 페이지 초과 시 1로 복귀
   useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
@@ -3037,38 +3068,50 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
           <input type="text" value={filters.name} onChange={e => updateF('name', e.target.value)}
             placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
         </FilterBtn>
-        <FilterBtn label="주소" k="address" openF={openF} setOpenF={setOpenF} hasValue={hasValue('address')}>
+        {!onlyMy && <FilterBtn label="주소" k="address" openF={openF} setOpenF={setOpenF} hasValue={hasValue('address')}>
           <input type="text" value={filters.address} onChange={e => updateF('address', e.target.value)}
             placeholder="주소 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
-        </FilterBtn>
-        <FilterBtn label="사업자 형태" k="bizType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('bizType')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="사업자 형태" k="bizType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('bizType')}>
           <MultiOpts opts={['법인사업자','개인사업자','개인사','공공기관','비영리법인','기타']} selected={filters.bizType} onToggle={v => toggleArr('bizType', v)}/>
-        </FilterBtn>
-        <FilterBtn label="거래처 분류" k="classCat" openF={openF} setOpenF={setOpenF} hasValue={hasValue('classCat')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="거래처 분류" k="classCat" openF={openF} setOpenF={setOpenF} hasValue={hasValue('classCat')}>
           <MultiOpts opts={['대기업','중견기업','중소기업','공기관','기타']} selected={filters.classCat} onToggle={v => toggleArr('classCat', v)}/>
-        </FilterBtn>
-        <FilterBtn label="☆ 거래처 등급" k="grade" openF={openF} setOpenF={setOpenF} hasValue={hasValue('grade')} highlight>
+        </FilterBtn>}
+        <FilterBtn label="☆ 거래처 등급" k="grade" openF={openF} setOpenF={setOpenF} hasValue={hasValue('grade')}>
           <MultiOpts opts={['A (최우선)','B (우선)','C (중기)','D (잠재)','E (관찰)','F (비활성)']}
             selected={filters.grade.map(g => g)}
             onToggle={v => toggleArr('grade', v[0])}
             renderLabel={v => v}
             keyOf={v => v[0]}/>
         </FilterBtn>
-        <FilterBtn label="거래처 국가" k="nation" openF={openF} setOpenF={setOpenF} hasValue={hasValue('nation')}>
+        {!onlyMy && <FilterBtn label="거래처 국가" k="nation" openF={openF} setOpenF={setOpenF} hasValue={hasValue('nation')}>
           <RadioOpts name="nation" opts={[['all','전체'],['국내','국내'],['글로벌','글로벌']]} value={filters.nation} onChange={v => updateF('nation', v)}/>
-        </FilterBtn>
-        <FilterBtn label="사업장 구분" k="site" openF={openF} setOpenF={setOpenF} hasValue={hasValue('site')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="사업장 구분" k="site" openF={openF} setOpenF={setOpenF} hasValue={hasValue('site')}>
           <RadioOpts name="site" opts={[['all','전체'],['본사','본점'],['지점','지점']]} value={filters.site} onChange={v => updateF('site', v)}/>
-        </FilterBtn>
-        <FilterBtn label="지점보유 여부" k="branch" openF={openF} setOpenF={setOpenF} hasValue={hasValue('branch')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="지점보유 여부" k="branch" openF={openF} setOpenF={setOpenF} hasValue={hasValue('branch')}>
           <RadioOpts name="branch" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.branch} onChange={v => updateF('branch', v)}/>
-        </FilterBtn>
-        <FilterBtn label="당사 계약 여부" k="contract" openF={openF} setOpenF={setOpenF} hasValue={hasValue('contract')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="당사 계약 여부" k="contract" openF={openF} setOpenF={setOpenF} hasValue={hasValue('contract')}>
           <RadioOpts name="contract" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.contract} onChange={v => updateF('contract', v)}/>
-        </FilterBtn>
+        </FilterBtn>}
+        {/* My 모드일 때 정렬을 첫 줄 우측에 배치 */}
+        {onlyMy && (
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="expiry">예상 만기일 임박순</option>
+            <option value="cfExpiry">확정 만기일 임박순</option>
+            <option value="area">면적 큰 순</option>
+            <option value="grade">등급 높은 순</option>
+            <option value="recent">최근 접촉 순</option>
+            <option value="name">가나다 순</option>
+          </select>
+        )}
       </div>
 
-      {/* Filter bar - row 2 */}
+      {/* Filter bar - row 2 (My 거래처에서는 일부 필터만 표시) */}
       <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
         <span className="text-[11px] text-slate-300 mr-1">　</span>
         <FilterBtn label="📋 만기일 구분" k="expiryType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('expiryType')}>
@@ -3082,50 +3125,62 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
           <DateRange minVal={filters.cfDateMin} maxVal={filters.cfDateMax}
             onMin={v => updateF('cfDateMin', v)} onMax={v => updateF('cfDateMax', v)}/>
         </FilterBtn>
-        <FilterBtn label="예상 임차 면적(평)" k="expArea" openF={openF} setOpenF={setOpenF} hasValue={filters.expAreaMin || filters.expAreaMax}>
+        {!onlyMy && <FilterBtn label="예상 임차 면적(평)" k="expArea" openF={openF} setOpenF={setOpenF} hasValue={filters.expAreaMin || filters.expAreaMax}>
           <NumRange minVal={filters.expAreaMin} maxVal={filters.expAreaMax}
             onMin={v => updateF('expAreaMin', v)} onMax={v => updateF('expAreaMax', v)} unit="평"/>
-        </FilterBtn>
-        <FilterBtn label="확정 임차 면적(평)" k="cfArea" openF={openF} setOpenF={setOpenF} hasValue={filters.cfAreaMin || filters.cfAreaMax}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="확정 임차 면적(평)" k="cfArea" openF={openF} setOpenF={setOpenF} hasValue={filters.cfAreaMin || filters.cfAreaMax}>
           <NumRange minVal={filters.cfAreaMin} maxVal={filters.cfAreaMax}
             onMin={v => updateF('cfAreaMin', v)} onMax={v => updateF('cfAreaMax', v)} unit="평"/>
-        </FilterBtn>
+        </FilterBtn>}
         <FilterBtn label="딜 진행중" k="deal" openF={openF} setOpenF={setOpenF} hasValue={hasValue('deal')}>
           <RadioOpts name="deal" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.deal} onChange={v => updateF('deal', v)}/>
         </FilterBtn>
-        <FilterBtn label="미관리 대상" k="inactive" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactive')}>
+        {!onlyMy && <FilterBtn label="미관리 대상" k="inactive" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactive')}>
           <RadioOpts name="inactive" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.inactive} onChange={v => updateF('inactive', v)}/>
-        </FilterBtn>
-        <FilterBtn label="미관리 사유" k="inactiveReason" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactiveReason')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="미관리 사유" k="inactiveReason" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactiveReason')}>
           <MultiOpts opts={['경쟁업체 부동산','임대인','폐업','기타']} selected={filters.inactiveReason} onToggle={v => toggleArr('inactiveReason', v)}/>
-        </FilterBtn>
-        <FilterBtn label="담당자 유무" k="manager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('manager')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="담당자 유무" k="manager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('manager')}>
           <RadioOpts name="manager" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.manager} onChange={v => updateF('manager', v)}/>
-        </FilterBtn>
-        <FilterBtn label="핸드폰 유무" k="phone" openF={openF} setOpenF={setOpenF} hasValue={hasValue('phone')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="핸드폰 유무" k="phone" openF={openF} setOpenF={setOpenF} hasValue={hasValue('phone')}>
           <RadioOpts name="phone" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.phone} onChange={v => updateF('phone', v)}/>
-        </FilterBtn>
-        <FilterBtn label="이메일 유무" k="email" openF={openF} setOpenF={setOpenF} hasValue={hasValue('email')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="이메일 유무" k="email" openF={openF} setOpenF={setOpenF} hasValue={hasValue('email')}>
           <RadioOpts name="email" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.email} onChange={v => updateF('email', v)}/>
-        </FilterBtn>
-        <FilterBtn label="회사번호 유무" k="tel" openF={openF} setOpenF={setOpenF} hasValue={hasValue('tel')}>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="회사번호 유무" k="tel" openF={openF} setOpenF={setOpenF} hasValue={hasValue('tel')}>
           <RadioOpts name="tel" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.tel} onChange={v => updateF('tel', v)}/>
-        </FilterBtn>
-        {/* 정렬 — 우측 끝 (필터 결과 정렬 컨텍스트) */}
-        <select value={sort} onChange={e => setSort(e.target.value)}
-          className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
-          <option value="expiry">예상 만기일 임박순</option>
-          <option value="cfExpiry">확정 만기일 임박순</option>
-          <option value="area">면적 큰 순</option>
-          <option value="grade">등급 높은 순</option>
-          <option value="recent">최근 접촉 순</option>
-          <option value="longUncontact">장기 미접촉 순</option>
-          <option value="name">가나다 순</option>
-        </select>
+        </FilterBtn>}
+        {!onlyMy && <FilterBtn label="👤 세일즈 담당자" k="salesManager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('salesManager')}>
+          <MultiOpts opts={['장한덕','송승원','박환웅','박인하','주정호','임정수','최필규','정혜정','김민희','구민모']}
+            selected={filters.salesManager} onToggle={v => toggleArr('salesManager', v)}/>
+        </FilterBtn>}
+        {/* 전체 모드일 때만 정렬을 2행 우측에 표시 */}
+        {!onlyMy && (
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+            <option value="expiry">예상 만기일 임박순</option>
+            <option value="cfExpiry">확정 만기일 임박순</option>
+            <option value="area">면적 큰 순</option>
+            <option value="grade">등급 높은 순</option>
+            <option value="recent">최근 접촉 순</option>
+            <option value="longUncontact">장기 미접촉 순</option>
+            <option value="name">가나다 순</option>
+          </select>
+        )}
       </div>
 
       <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
         <div className="font-semibold">총 <span className="text-rose-600 font-bold">{filtered.length}</span> 개 · {page}/{totalPages} 페이지</div>
+        <select value={perPage} onChange={e => { setPerPage(+e.target.value); setPage(1); }}
+          className="px-2 py-1 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value={15}>15개씩</option>
+          <option value={30}>30개씩</option>
+          <option value={50}>50개씩</option>
+        </select>
       </div>
 
       <div className="flex-1 overflow-auto">
