@@ -2154,15 +2154,18 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
       <div className="p-5 space-y-4">
         {/* Top 3-column section */}
         <div className="grid gap-4" style={{gridTemplateColumns: '380px minmax(420px,1fr) 420px'}}>
-          {/* LEFT: photo + basic info */}
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            <BuildingPhoto building={building} />
-            <BasicInfoForm building={building} />
+          {/* LEFT: photo + basic info + 건물 추가 정보 */}
+          <div className="flex flex-col gap-4">
+            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+              <BuildingPhoto building={building} />
+              <BasicInfoForm building={building} editMode={editMode} />
+            </div>
+            <ExtraInfoSection building={building} />
           </div>
 
-          {/* MIDDLE: 임대안내문 + 컨택포인트 + 소유주 */}
+          {/* MIDDLE: 임대안내문 + 컨택포인트 + 소유주(+매각희망 포함) */}
           <div className="space-y-4">
-            <RentalInfoSection building={building} />
+            <RentalInfoSection building={building} editMode={editMode} />
             <ContactsSection building={building} />
             <OwnerSection building={building} />
           </div>
@@ -2218,23 +2221,14 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
           </div>
         </div>
 
-        {/* 건물 추가 정보 (역과의 거리, 대지 면적, 건물 주용도, 매각 희망, 당사 계약) */}
-        <ExtraInfoSection building={building} />
-
         {/* 기준층 정보 (평단가) */}
         <BaseStandardTable building={building} />
 
-        {/* 입주사 (렌트롤) — 거래처 페이지에서 불러오기 */}
-        <TenantsSection building={building} />
-
-        {/* 도면 — PDF / 사진 업로드 */}
-        <FloorPlansSection building={building} />
-
-        {/* 시장 계약 사례 — 계약 페이지에서 불러오기 */}
-        <MarketDealsSection building={building} />
-
-        {/* 개별공실 정보 */}
+        {/* 개별공실 정보 — 빠른 가독성을 위해 평단가 바로 아래 */}
         <VacancyDetailTable building={building} onAddVacancy={onAddVacancy} onAddAllVacancies={onAddAllVacancies} cart={cart} />
+
+        {/* 입주사 / 도면 / 당사 계약 / 시장 계약 사례 — 4개 가로 접이식 */}
+        <CollapsibleRow building={building} />
       </div>
     </div>
   );
@@ -2264,7 +2258,36 @@ function BuildingPhoto({ building }) {
 }
 
 /* ----- 기본 정보 폼 ----- */
-function BasicInfoForm({ building: b }) {
+/* ----- 기본 정보 폼 (editMode일 때 입력 가능) ----- */
+function BasicInfoForm({ building: b, editMode }) {
+  const [name, setName] = useState(b.name);
+  const [alias, setAlias] = useState(b.alias || '');
+  const [address, setAddress] = useState(b.address);
+  const [contractType, setContractType] = useState(b.contractType || '');
+  const [built, setBuilt] = useState(b.built);
+  const [renovated, setRenovated] = useState(b.renovated || '');
+  const [aboveFloors, setAboveFloors] = useState(b.aboveFloors);
+  const [belowFloors, setBelowFloors] = useState(b.belowFloors);
+  const [area, setArea] = useState(b.area);
+  const [scale, setScale] = useState(b.scale || '');
+  const [occupancy, setOccupancy] = useState(b.occupancy);
+  const [evP, setEvP] = useState(b.elevators?.passenger ?? '');
+  const [evE, setEvE] = useState(b.elevators?.emergency ?? '');
+  const [evT, setEvT] = useState(b.elevators?.total ?? '');
+  const [parkTotal, setParkTotal] = useState(b.parkingDetail?.total ?? '');
+  const [parkSelf, setParkSelf] = useState(b.parkingDetail?.self ?? '');
+  const [parkMech, setParkMech] = useState(b.parkingDetail?.mechanical ?? '');
+
+  // 편집 값/표시 값 선택 헬퍼
+  const inp = (val, setter, suffix, type = 'text', placeholder) => editMode ? (
+    <span className="flex items-center gap-1 w-full">
+      <input type={type} value={val} onChange={e => setter(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 min-w-0 px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+      {suffix && <span className="text-slate-500 text-[10px]">{suffix}</span>}
+    </span>
+  ) : <>{val}{suffix && ` ${suffix}`}</>;
+
   const Row = ({ label, children, label2, children2 }) => (
     <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
       <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
@@ -2275,41 +2298,133 @@ function BasicInfoForm({ building: b }) {
       </>)}
     </div>
   );
+
   return (
     <div>
       <div className="grid grid-cols-12 text-[11px]">
         <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">빌딩명</div>
-        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 font-bold">{b.name}{b.alias && <span className="text-slate-400 font-normal text-[10px] ml-1">({b.alias})</span>}</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 font-bold flex items-center gap-1">
+          {editMode ? (
+            <>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="빌딩명"
+                className="flex-1 px-1.5 py-0.5 text-[11px] font-bold bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+              <input value={alias} onChange={e => setAlias(e.target.value)} placeholder="별칭"
+                className="w-32 px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+            </>
+          ) : <>{name}{alias && <span className="text-slate-400 font-normal text-[10px] ml-1">({alias})</span>}</>}
+        </div>
       </div>
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">주소</div>
-        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">{b.address}</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">
+          {editMode ? (
+            <input value={address} onChange={e => setAddress(e.target.value)} placeholder="주소"
+              className="w-full px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+          ) : address}
+        </div>
       </div>
       <Row label="전속 유형" label2="LM 권역"
-        children={<span className="text-slate-500">{b.contractType || '전속 유형 선택'}</span>}
+        children={editMode ? (
+          <select value={contractType} onChange={e => setContractType(e.target.value)}
+            className="w-full px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none cursor-pointer">
+            <option value="">선택</option>
+            <option>전속</option><option>단독 전속</option><option>비전속</option><option>해당 없음</option>
+          </select>
+        ) : <span className="text-slate-500">{contractType || '전속 유형 선택'}</span>}
         children2={<span className="font-bold" style={{color: REGION_COLORS[b.region].text}}>{REGION_COLORS[b.region].name}</span>} />
       <Row label="준공년도" label2="리모델링"
-        children={<>{b.built} 년</>}
-        children2={b.renovated ? <>{b.renovated}</> : <span className="text-slate-300">-</span>} />
+        children={inp(built, setBuilt, '년', 'number')}
+        children2={inp(renovated, setRenovated, '', 'text', '-')} />
       <Row label="지상층" label2="지하층"
-        children={<>{b.aboveFloors} F</>}
-        children2={<>{b.belowFloors} F</>} />
+        children={inp(aboveFloors, setAboveFloors, 'F', 'number')}
+        children2={inp(belowFloors, setBelowFloors, 'F', 'number')} />
       <Row label="연면적" label2="규모"
-        children={<>{b.area.toLocaleString()} 평</>}
-        children2={<span className="text-slate-500">{b.scale || '-'}</span>} />
+        children={inp(area, setArea, '평', 'number')}
+        children2={inp(scale, setScale, '', 'text', '-')} />
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">전용률</div>
-        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 text-right pr-3">{b.occupancy} %</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800 text-right pr-3">{inp(occupancy, setOccupancy, '%', 'number')}</div>
       </div>
       <Row label="승용 E/V" label2="비상용 E/V"
-        children={<>{b.elevators?.passenger ?? '-'} 대</>}
-        children2={<>{b.elevators?.emergency ?? '-'} 대</>} />
+        children={inp(evP, setEvP, '대', 'number')}
+        children2={inp(evE, setEvE, '대', 'number')} />
       <Row label="총 주차 대수" label2="총 E/V"
-        children={<>{b.parkingDetail?.total ?? '-'} 대</>}
-        children2={<>{b.elevators?.total ?? '-'} 대</>} />
+        children={inp(parkTotal, setParkTotal, '대', 'number')}
+        children2={inp(evT, setEvT, '대', 'number')} />
       <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
         <div className="col-span-3 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">자주식 / 기계식 대수</div>
-        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">기계식 {b.parkingDetail?.mechanical ?? 0} 대 / 자주식 {b.parkingDetail?.self ?? 0} 대</div>
+        <div className="col-span-9 px-2.5 py-1.5 text-slate-800">
+          {editMode ? (
+            <span className="flex items-center gap-1 flex-wrap">
+              기계식
+              <input type="number" value={parkMech} onChange={e => setParkMech(e.target.value)}
+                className="w-16 px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+              대 / 자주식
+              <input type="number" value={parkSelf} onChange={e => setParkSelf(e.target.value)}
+                className="w-16 px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
+              대
+            </span>
+          ) : `기계식 ${parkMech || 0} 대 / 자주식 ${parkSelf || 0} 대`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----- 임대안내문 부가 정보 (editMode 지원) ----- */
+function RentalInfoSection({ building: b, editMode }) {
+  const [parkFree, setParkFree] = useState(b.parkingFree || '');
+  const [parkPaid, setParkPaid] = useState(b.parkingPaid || '');
+  const [heating, setHeating] = useState(b.heating || '');
+  const [notes, setNotes] = useState(b.notes || '');
+  const [locationInfo, setLocationInfo] = useState(b.locationInfo || '');
+
+  const inputClass = "w-full px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500";
+
+  const Row = ({ label, value }) => (
+    <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+      <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
+      <div className="col-span-9 px-2.5 py-2 text-slate-800">{value}</div>
+    </div>
+  );
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-slate-800">임대안내문 부가 정보</span>
+        <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-600">
+          <input type="checkbox" defaultChecked className="accent-indigo-600" />
+          임대안내문 포함
+        </label>
+      </div>
+      <div>
+        <div className="grid grid-cols-12 text-[11px]">
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">무료 주차</div>
+          <div className="col-span-3 px-2.5 py-2 text-slate-800 border-r border-slate-100">
+            {editMode ? <input value={parkFree} onChange={e => setParkFree(e.target.value)} className={inputClass}/> : parkFree || '-'}
+          </div>
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">유료 주차</div>
+          <div className="col-span-3 px-2.5 py-2 text-slate-800">
+            {editMode ? <input value={parkPaid} onChange={e => setParkPaid(e.target.value)} className={inputClass}/> : parkPaid || '-'}
+          </div>
+        </div>
+        <Row label="냉 / 난방" value={
+          editMode ? (
+            <select value={heating} onChange={e => setHeating(e.target.value)}
+              className="w-full px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none cursor-pointer">
+              <option value="">선택</option>
+              <option>중앙 냉/난방</option><option>개별 냉/난방</option><option>EHP</option><option>기타</option>
+            </select>
+          ) : (heating || '-')
+        } />
+        <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
+          <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">특이사항</div>
+          <div className="col-span-9 px-2.5 py-2 text-slate-800">
+            {editMode ? <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={inputClass + ' resize-none'}/> : (notes || '-')}
+          </div>
+        </div>
+        <Row label="위치 정보" value={
+          editMode ? <input value={locationInfo} onChange={e => setLocationInfo(e.target.value)} className={inputClass}/> : (locationInfo || '-')
+        } />
       </div>
     </div>
   );
@@ -2389,178 +2504,203 @@ function ContactsSection({ building: b }) {
 
 /* ----- 소유주 정보 (컨택포인트 하단) ----- */
 function OwnerSection({ building: b }) {
-  const owner = b.owner || {};
-  const Row = ({ label, value }) => (
+  const OWNER_TYPES = ['개인','법인','운용사','리츠','신탁사','공공기관','외국계','기타'];
+  const initial = b.owner || {};
+  const [type, setType] = useState(initial.type || '');
+  const [name, setName] = useState(initial.name || '');
+  const [pm, setPm] = useState(initial.pm || '');
+  const [lm, setLm] = useState(initial.lm || '');
+  const [forSale, setForSale] = useState(b.forSale || '');
+  const [forSaleNote, setForSaleNote] = useState(b.forSaleNote || '');
+
+  const FieldRow = ({ label, children }) => (
     <div className="grid grid-cols-12 border-t border-slate-100 text-[11px]">
-      <div className="col-span-3 bg-slate-50 px-2.5 py-2 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
-      <div className="col-span-9 px-2.5 py-2 text-slate-800">{value || <span className="text-slate-300">-</span>}</div>
+      <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">{label}</div>
+      <div className="col-span-8 px-2 py-1 text-slate-800 flex items-center">{children}</div>
     </div>
   );
+
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
         <span className="text-[13px] font-bold text-slate-800">소유주</span>
-        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">편집</button>
+        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">저장</button>
       </div>
       <div>
-        <Row label="소유주 유형" value={owner.type || <span className="text-slate-400">개인/법인/운용사/리츠/신탁사/공공기관/외국계/기타</span>} />
-        <Row label="소유주 명" value={owner.name} />
-        <Row label="PM 관리" value={owner.pm} />
-        <Row label="LM 관리" value={owner.lm} />
+        <FieldRow label="소유주 유형">
+          <select value={type} onChange={e => setType(e.target.value)}
+            className="w-full bg-transparent text-slate-800 outline-none text-[11px] cursor-pointer">
+            <option value="">선택</option>
+            {OWNER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </FieldRow>
+        <FieldRow label="소유주 명">
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
+        </FieldRow>
+        <FieldRow label="PM 관리">
+          <input type="text" value={pm} onChange={e => setPm(e.target.value)}
+            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
+        </FieldRow>
+        <FieldRow label="LM 관리">
+          <input type="text" value={lm} onChange={e => setLm(e.target.value)}
+            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
+        </FieldRow>
+        {/* 매각 희망 — 소유주와 연관 */}
+        <FieldRow label="매각 희망">
+          <div className="flex items-center gap-2">
+            <select value={forSale} onChange={e => setForSale(e.target.value)}
+              className="px-2 py-0.5 text-[11px] border border-slate-200 rounded bg-white outline-none cursor-pointer">
+              <option value="">선택</option>
+              <option value="Y">Y</option>
+              <option value="N">N</option>
+            </select>
+            <input type="text" value={forSaleNote} onChange={e => setForSaleNote(e.target.value)}
+              placeholder="매각 사유/메모" className="flex-1 bg-transparent text-slate-800 outline-none text-[11px] py-0.5 border-l border-slate-100 pl-2"/>
+          </div>
+        </FieldRow>
       </div>
     </div>
   );
 }
 
-/* ----- 건물 추가 정보 (역과의 거리, 대지 면적, 건물 주용도, 매각 희망, 당사 계약) ----- */
+/* ----- 건물 추가 정보 (역과의 거리, 대지 면적, 기준층 임대/전용면적, 건물 주용도) ----- */
 function ExtraInfoSection({ building: b }) {
+  const [distEdit, setDistEdit] = useState(b.distFromStation || '');
+  const [landEdit, setLandEdit] = useState(b.landArea || '');
+  const [useEdit, setUseEdit] = useState(b.mainUse || '');
+  const USES = ['사무실','상가','지식산업센터','물류센터','공장','오피스텔','복합시설','기타'];
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
         <span className="text-[13px] font-bold text-slate-800">건물 추가 정보</span>
-        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">편집</button>
+        <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800">저장</button>
       </div>
-      <div className="grid grid-cols-5 text-[11px]">
-        <Cell label="역과의 거리" value={b.distFromStation ? `${b.distFromStation} m` : <span className="text-slate-300">수기 입력</span>} />
-        <Cell label="대지 면적" value={b.landArea ? `${b.landArea} ㎡` : <span className="text-slate-300">수기 입력</span>} />
-        <Cell label="기준층 임대면적" value={b.baseLease ? `${b.baseLease} 평` : <span className="text-slate-300">-</span>} />
-        <Cell label="기준층 전용면적" value={b.baseNet ? `${b.baseNet} 평` : <span className="text-slate-300">-</span>} />
-        <Cell label="건물 주용도" value={b.mainUse || <span className="text-slate-400">사무실/상가/지식산업센터/...</span>} last />
-      </div>
-      <div className="grid grid-cols-3 text-[11px] border-t border-slate-100">
-        <Cell label="매각 희망" value={
-          <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${b.forSale === 'Y' ? 'bg-rose-100 text-rose-700' : b.forSale === 'N' ? 'bg-slate-100 text-slate-600' : ''}`}>
-            {b.forSale || 'Y/N'}
-          </span>
-        } />
-        <Cell label="당사 계약" value={b.ourDeal || <span className="text-slate-300">수기 기입</span>} />
-        <Cell label="" value="" last />
-      </div>
-    </div>
-  );
-}
-
-function Cell({ label, value, last }) {
-  return (
-    <div className={`flex flex-col ${last ? '' : 'border-r border-slate-100'}`}>
-      <div className="bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 border-b border-slate-100">{label}</div>
-      <div className="px-2.5 py-2 text-slate-800">{value}</div>
-    </div>
-  );
-}
-
-/* ----- 입주사 (렌트롤) ----- */
-function TenantsSection({ building: b }) {
-  const tenants = b.tenants || []; // 거래처 페이지에서 불러옴 (현재는 빈 데이터)
-  return (
-    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-        <span className="text-[13px] font-bold text-slate-800">입주사 <span className="text-[10px] font-normal text-slate-400 ml-1">(렌트롤 · 거래처 페이지 연동)</span></span>
-        <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">거래처에서 불러오기</button>
-          <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 추가</button>
+      <div className="grid grid-cols-12 text-[11px]">
+        <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">역과의 거리</div>
+        <div className="col-span-8 px-2 py-1 flex items-center gap-1">
+          <input type="number" value={distEdit} onChange={e => setDistEdit(e.target.value)}
+            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
+          <span className="text-slate-500 text-[10px]">m</span>
         </div>
       </div>
-      {tenants.length === 0 ? (
-        <div className="text-center text-[11px] text-slate-400 py-8">등록된 입주사가 없습니다 · 거래처 페이지에서 불러올 수 있습니다</div>
-      ) : (
-        <table className="w-full text-[11px] tabular-nums">
-          <thead className="bg-slate-50">
-            <tr className="text-slate-500 font-semibold whitespace-nowrap">
-              <th className="px-3 py-2 text-left">층</th>
-              <th className="px-3 py-2 text-left">회사명</th>
-              <th className="px-3 py-2 text-right">임대 면적</th>
-              <th className="px-3 py-2 text-right">전용 면적</th>
-              <th className="px-3 py-2 text-left">계약 기간</th>
-              <th className="px-3 py-2 text-left">임차 조건</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tenants.map((t, i) => (
-              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2">{t.floor}</td>
-                <td className="px-3 py-2 font-semibold">{t.company}</td>
-                <td className="px-3 py-2 text-right">{t.leaseArea}</td>
-                <td className="px-3 py-2 text-right">{t.netArea}</td>
-                <td className="px-3 py-2">{t.period}</td>
-                <td className="px-3 py-2 text-slate-600">{t.terms}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">대지 면적</div>
+        <div className="col-span-8 px-2 py-1 flex items-center gap-1">
+          <input type="number" value={landEdit} onChange={e => setLandEdit(e.target.value)}
+            placeholder="수기 입력" className="w-full bg-transparent text-slate-800 outline-none text-[11px] py-0.5"/>
+          <span className="text-slate-500 text-[10px]">㎡</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">기준층 임대면적</div>
+        <div className="col-span-8 px-2 py-1 text-slate-800">{b.baseLease ? `${b.baseLease} 평` : <span className="text-slate-300">-</span>}</div>
+      </div>
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">기준층 전용면적</div>
+        <div className="col-span-8 px-2 py-1 text-slate-800">{b.baseNet ? `${b.baseNet} 평` : <span className="text-slate-300">-</span>}</div>
+      </div>
+      <div className="grid grid-cols-12 text-[11px] border-t border-slate-100">
+        <div className="col-span-4 bg-slate-50 px-2.5 py-1.5 font-semibold text-slate-600 border-r border-slate-100 flex items-center">건물 주용도</div>
+        <div className="col-span-8 px-2 py-1">
+          <select value={useEdit} onChange={e => setUseEdit(e.target.value)}
+            className="w-full bg-transparent text-slate-800 outline-none text-[11px] cursor-pointer">
+            <option value="">선택</option>
+            {USES.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ----- 도면 (PDF / 사진 업로드) ----- */
-function FloorPlansSection({ building: b }) {
-  const plans = b.floorPlans || [];
+/* ----- 4개 가로 접이식 패널: 입주사 / 도면 / 당사 계약 / 시장 계약 사례 ----- */
+function CollapsibleRow({ building }) {
+  const [open, setOpen] = useState(null); // 'tenants' | 'plans' | 'ourDeals' | 'marketDeals' | null
+  const cards = [
+    { k: 'tenants',    title: '입주사',        sub: '렌트롤 · 거래처 페이지 연동', count: (building.tenants || []).length,    actions: [['거래처에서 불러오기','outline'], ['+ 추가','solid']] },
+    { k: 'plans',      title: '도면',          sub: 'PDF · 사진 파일',              count: (building.floorPlans || []).length, actions: [['+ 파일 업로드','solid']] },
+    { k: 'ourDeals',   title: '당사 계약',     sub: '계약 페이지 연동',              count: (building.ourDealsList || []).length, actions: [['계약에서 불러오기','outline'], ['+ 추가','solid']] },
+    { k: 'marketDeals',title: '시장 계약 사례',sub: '계약 페이지 연동',              count: (building.marketDeals || []).length, actions: [['+ 추가','solid']] },
+  ];
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-        <span className="text-[13px] font-bold text-slate-800">도면 <span className="text-[10px] font-normal text-slate-400 ml-1">(PDF · 사진 파일)</span></span>
-        <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 파일 업로드</button>
-      </div>
-      {plans.length === 0 ? (
-        <div className="text-center text-[11px] text-slate-400 py-8">등록된 도면 파일이 없습니다 · PDF, JPG, PNG 업로드 가능</div>
-      ) : (
-        <div className="grid grid-cols-4 gap-2 p-3">
-          {plans.map((p, i) => (
-            <div key={i} className="border border-slate-200 rounded p-2 hover:border-slate-300">
-              <div className="aspect-[4/3] bg-slate-100 rounded flex items-center justify-center text-slate-400">
-                <FileText size={20} />
+    <div className="grid grid-cols-4 gap-3">
+      {cards.map(c => {
+        const expanded = open === c.k;
+        return (
+          <div key={c.k} className={`bg-white rounded-lg border ${expanded ? 'border-indigo-300 shadow-md col-span-4' : 'border-slate-200'} overflow-hidden transition`}>
+            <button onClick={() => setOpen(expanded ? null : c.k)}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition text-left">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[12px] font-bold text-slate-800 truncate">{c.title}</span>
+                <span className="text-[10px] text-slate-400 truncate">({c.sub})</span>
               </div>
-              <div className="text-[11px] font-semibold mt-1.5 truncate">{p.name}</div>
-              <div className="text-[10px] text-slate-500">{p.size}</div>
-            </div>
-          ))}
-        </div>
-      )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">{c.count}건</span>
+                <ChevronDown size={14} className={`text-slate-400 transition ${expanded ? 'rotate-180' : ''}`}/>
+              </div>
+            </button>
+            {expanded && (
+              <div className="border-t border-slate-200">
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-end gap-2">
+                  {c.actions.map(([label, style], i) => (
+                    <button key={i} className={`px-2.5 py-1 text-[10px] font-bold rounded ${
+                      style === 'solid' ? 'bg-slate-800 text-white hover:bg-slate-900' :
+                      'border border-slate-200 text-slate-700 hover:bg-white'
+                    }`}>{label}</button>
+                  ))}
+                </div>
+                {c.k === 'tenants' && <ListBody items={building.tenants} emptyText="등록된 입주사가 없습니다 · 거래처 페이지에서 불러올 수 있습니다" cols={['층','회사명','임대 면적','전용 면적','계약 기간','임차 조건']} render={t => [t.floor, t.company, t.leaseArea, t.netArea, t.period, t.terms]}/>}
+                {c.k === 'plans' && <FilesBody plans={building.floorPlans}/>}
+                {c.k === 'ourDeals' && <ListBody items={building.ourDealsList} emptyText="등록된 계약이 없습니다 · 계약 페이지에서 불러올 수 있습니다" cols={['층','회사명','임대 면적','전용 면적','계약 기간','임차 조건']} render={d => [d.floor, d.company, d.leaseArea, d.netArea, d.period, d.terms]}/>}
+                {c.k === 'marketDeals' && <ListBody items={building.marketDeals} emptyText="등록된 계약 사례가 없습니다 · 계약 페이지에서 불러올 수 있습니다" cols={['층','회사명','임대 면적','전용 면적','계약 기간','임차 조건']} render={d => [d.floor, d.company, d.leaseArea, d.netArea, d.period, d.terms]}/>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/* ----- 시장 계약 사례 ----- */
-function MarketDealsSection({ building: b }) {
-  const deals = b.marketDeals || [];
+function ListBody({ items, emptyText, cols, render }) {
+  if (!items || items.length === 0) {
+    return <div className="text-center text-[11px] text-slate-400 py-8 px-4">{emptyText}</div>;
+  }
   return (
-    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-        <span className="text-[13px] font-bold text-slate-800">시장 계약 사례 <span className="text-[10px] font-normal text-slate-400 ml-1">(계약 페이지 연동)</span></span>
-        <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">계약에서 불러오기</button>
-          <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">+ 추가</button>
+    <table className="w-full text-[11px] tabular-nums">
+      <thead className="bg-slate-50">
+        <tr className="text-slate-500 font-semibold whitespace-nowrap">
+          {cols.map(c => <th key={c} className="px-3 py-2 text-left">{c}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((it, i) => (
+          <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+            {render(it).map((v, j) => <td key={j} className="px-3 py-2 text-slate-700">{v}</td>)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function FilesBody({ plans }) {
+  if (!plans || plans.length === 0) {
+    return <div className="text-center text-[11px] text-slate-400 py-8 px-4">등록된 도면 파일이 없습니다 · PDF, JPG, PNG 업로드 가능</div>;
+  }
+  return (
+    <div className="grid grid-cols-6 gap-2 p-3">
+      {plans.map((p, i) => (
+        <div key={i} className="border border-slate-200 rounded p-2 hover:border-slate-300">
+          <div className="aspect-[4/3] bg-slate-100 rounded flex items-center justify-center text-slate-400">
+            <FileText size={20} />
+          </div>
+          <div className="text-[11px] font-semibold mt-1.5 truncate">{p.name}</div>
+          <div className="text-[10px] text-slate-500">{p.size}</div>
         </div>
-      </div>
-      {deals.length === 0 ? (
-        <div className="text-center text-[11px] text-slate-400 py-8">등록된 계약 사례가 없습니다 · 계약 페이지에서 불러올 수 있습니다</div>
-      ) : (
-        <table className="w-full text-[11px] tabular-nums">
-          <thead className="bg-slate-50">
-            <tr className="text-slate-500 font-semibold whitespace-nowrap">
-              <th className="px-3 py-2 text-left">층</th>
-              <th className="px-3 py-2 text-left">회사명</th>
-              <th className="px-3 py-2 text-right">임대 면적</th>
-              <th className="px-3 py-2 text-right">전용 면적</th>
-              <th className="px-3 py-2 text-left">계약 기간</th>
-              <th className="px-3 py-2 text-left">임차 조건</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deals.map((d, i) => (
-              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
-                <td className="px-3 py-2">{d.floor}</td>
-                <td className="px-3 py-2 font-semibold">{d.company}</td>
-                <td className="px-3 py-2 text-right">{d.leaseArea}</td>
-                <td className="px-3 py-2 text-right">{d.netArea}</td>
-                <td className="px-3 py-2">{d.period}</td>
-                <td className="px-3 py-2 text-slate-600">{d.terms}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      ))}
     </div>
   );
 }
@@ -2766,7 +2906,6 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
         <table className="w-full text-[11px] tabular-nums bg-white">
           <thead className="bg-slate-50 sticky top-0 z-10">
             <tr className="text-slate-500 font-semibold border-b border-slate-200">
-              <th className="px-3 py-2 text-center w-8"></th>
               <th className="px-3 py-2 text-left">빌딩명</th>
               <th className="px-3 py-2 text-left">주소</th>
               <th className="px-3 py-2 text-right">연면적</th>
@@ -2779,7 +2918,7 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="9" className="text-center text-slate-400 py-12 text-[12px]">조건에 맞는 빌딩이 없습니다</td></tr>
+              <tr><td colSpan="8" className="text-center text-slate-400 py-12 text-[12px]">조건에 맞는 빌딩이 없습니다</td></tr>
             ) : (
               paged.map(b => {
                 const vacSum = sumVacArea(b);
@@ -2788,14 +2927,6 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
                 const color = REGION_COLORS[b.region];
                 return (
                   <tr key={b.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                    <td className="px-3 py-2 text-center">
-                      <button onClick={() => toggleStar(b.id)}
-                        className={isStar ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill={isStar ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                          <polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/>
-                        </svg>
-                      </button>
-                    </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: color.bg}} title={color.name} />
@@ -3187,7 +3318,6 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
         <table className="w-full text-[11px] bg-white">
           <thead className="bg-slate-50 sticky top-0 z-10">
             <tr className="text-slate-500 font-semibold border-b border-slate-200">
-              <th className="px-2 py-2 text-center w-8"></th>
               <th className="px-3 py-2 text-left">거래처명</th>
               <th className="px-3 py-2 text-left">사업자 형태</th>
               <th className="px-3 py-2 text-left">거래처 분류</th>
@@ -3206,17 +3336,8 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
               return (
                 <tr key={c.id} onClick={() => onOpenDetail(c.id)}
                   className="border-b border-slate-100 hover:bg-indigo-50/40 cursor-pointer transition">
-                  <td className="px-2 py-2.5 text-center">
-                    <button onClick={e => { e.stopPropagation(); toggleStar(c.id); }}
-                      className={isStar ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill={isStar ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                        <polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/>
-                      </svg>
-                    </button>
-                  </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{backgroundColor: dotColor(c)}}/>
                       <span className="font-semibold text-slate-800">{c.n}</span>
                       <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.g] || GRADE_STYLES.E}`}>{c.g}</span>
                     </div>
