@@ -735,7 +735,7 @@ const NAV_SECTIONS = [
     { icon: Briefcase, label: '거래처', children: ['전체 거래처', 'My 거래처'] },
   ]},
   { divider: true, items: [
-    { icon: Sparkles, label: '영업', children: ['전체 딜', 'My 딜'] },
+    { icon: Sparkles, label: '딜', children: ['전체 딜', 'My 딜'] },
     { icon: FileText, label: '계약', children: ['전체 계약', 'My 계약'] },
   ]},
   { divider: true, items: [
@@ -1293,15 +1293,16 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
                   )}
 
                   {def.type === 'multi' && (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
                       {def.options.map(opt => {
                         const selected = val.includes(opt);
                         return (
-                          <button key={opt}
-                            onClick={() => setFilters({ ...filters, [def.key]: selected ? val.filter(o => o !== opt) : [...val, opt] })}
-                            className={`px-3 py-1.5 text-[11px] font-bold rounded-md transition text-left ${selected ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                          <label key={opt} className="flex items-center gap-2 px-1.5 py-1 text-[12px] hover:bg-slate-50 rounded cursor-pointer">
+                            <input type="checkbox" checked={selected}
+                              onChange={() => setFilters({ ...filters, [def.key]: selected ? val.filter(o => o !== opt) : [...val, opt] })}
+                              className="accent-indigo-600"/>
                             {opt}
-                          </button>
+                          </label>
                         );
                       })}
                     </div>
@@ -3185,18 +3186,24 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
       // 거래처 등급
       if (filters.grade.length > 0 && !filters.grade.includes(c.g)) return false;
       // 국가
-      if (filters.nation !== 'all' && c.국 !== filters.nation) return false;
+      if (filters.nation.length > 0 && !filters.nation.includes(c.국)) return false;
       // 사업장 구분
-      if (filters.site !== 'all' && c.사 !== filters.site) return false;
+      if (filters.site.length > 0 && !filters.site.includes(c.사)) return false;
       // 지점보유
-      if (filters.branch !== 'all' && c.지 !== filters.branch) return false;
+      if (filters.branch.length > 0 && !filters.branch.includes(c.지)) return false;
       // 당사 계약
-      if (filters.contract !== 'all' && c.계 !== filters.contract) return false;
-      // 만기일 구분
-      if (filters.expiryType === '예상' && c.예유 !== 'Y') return false;
-      if (filters.expiryType === '확정' && c.확만 === '-') return false;
-      if (filters.expiryType === '예상+확정' && c.예유 !== 'Y' && c.확만 === '-') return false;
-      if (filters.expiryType === '미확인' && (c.예유 === 'Y' || c.확만 !== '-')) return false;
+      if (filters.contract.length > 0 && !filters.contract.includes(c.계)) return false;
+      // 만기일 구분 (체크박스 다중선택)
+      if (filters.expiryType.length > 0) {
+        const wantExp = filters.expiryType.includes('예상 만기일');
+        const wantCf  = filters.expiryType.includes('확정 만기일');
+        const wantUk  = filters.expiryType.includes('미확인');
+        const isExp = c.예유 === 'Y';
+        const isCf  = c.확만 !== '-';
+        const isUk  = c.예유 !== 'Y' && c.확만 === '-';
+        const match = (wantExp && isExp) || (wantCf && isCf) || (wantUk && isUk);
+        if (!match) return false;
+      }
       // 예상 만기일 범위
       if (filters.expDateMin && c.예 < filters.expDateMin.replace(/-/g,'.')) return false;
       if (filters.expDateMax && c.예 !== '-' && c.예 > filters.expDateMax.replace(/-/g,'.')) return false;
@@ -3210,14 +3217,14 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
       if (filters.cfAreaMin && cfArea < +filters.cfAreaMin) return false;
       if (filters.cfAreaMax && cfArea > +filters.cfAreaMax) return false;
       // 딜 진행
-      if (filters.deal !== 'all' && c.딜 !== filters.deal) return false;
+      if (filters.deal.length > 0 && !filters.deal.includes(c.딜)) return false;
       // 미관리 대상
-      if (filters.inactive !== 'all' && c.비 !== filters.inactive) return false;
+      if (filters.inactive.length > 0 && !filters.inactive.includes(c.비)) return false;
       // 유무
-      if (filters.manager !== 'all' && c.주담 !== filters.manager) return false;
-      if (filters.phone !== 'all' && c.폰 !== filters.phone) return false;
-      if (filters.email !== 'all' && c.메 !== filters.email) return false;
-      if (filters.tel !== 'all' && c.회 !== filters.tel) return false;
+      if (filters.manager.length > 0 && !filters.manager.includes(c.주담)) return false;
+      if (filters.phone.length > 0 && !filters.phone.includes(c.폰)) return false;
+      if (filters.email.length > 0 && !filters.email.includes(c.메)) return false;
+      if (filters.tel.length > 0 && !filters.tel.includes(c.회)) return false;
       // 세일즈 담당자 (다중)
       if (filters.salesManager.length > 0 && !filters.salesManager.includes(c.담)) return false;
       return true;
@@ -3310,16 +3317,16 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
             keyOf={v => v[0]}/>
         </FilterBtn>
         {!onlyMy && <FilterBtn label="거래처 국가" k="nation" openF={openF} setOpenF={setOpenF} hasValue={hasValue('nation')}>
-          <RadioOpts name="nation" opts={[['all','전체'],['국내','국내'],['글로벌','글로벌']]} value={filters.nation} onChange={v => updateF('nation', v)}/>
+          <MultiOpts opts={['국내','글로벌']} selected={filters.nation} onToggle={v => toggleArr('nation', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="사업장 구분" k="site" openF={openF} setOpenF={setOpenF} hasValue={hasValue('site')}>
-          <RadioOpts name="site" opts={[['all','전체'],['본사','본점'],['지점','지점']]} value={filters.site} onChange={v => updateF('site', v)}/>
+          <MultiOpts opts={['본사','지점']} selected={filters.site} onToggle={v => toggleArr('site', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="지점보유 여부" k="branch" openF={openF} setOpenF={setOpenF} hasValue={hasValue('branch')}>
-          <RadioOpts name="branch" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.branch} onChange={v => updateF('branch', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.branch} onToggle={v => toggleArr('branch', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="당사 계약 여부" k="contract" openF={openF} setOpenF={setOpenF} hasValue={hasValue('contract')}>
-          <RadioOpts name="contract" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.contract} onChange={v => updateF('contract', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.contract} onToggle={v => toggleArr('contract', v)}/>
         </FilterBtn>}
         {/* My 모드일 때 정렬을 첫 줄 우측에 배치 */}
         {onlyMy && (
@@ -3339,7 +3346,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
       <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
         <span className="text-[11px] text-slate-300 mr-1">　</span>
         <FilterBtn label="📋 만기일 구분" k="expiryType" openF={openF} setOpenF={setOpenF} hasValue={hasValue('expiryType')}>
-          <RadioOpts name="expiryType" opts={[['all','전체'],['예상','예상 만기일'],['확정','확정 만기일'],['예상+확정','예상+확정'],['미확인','미확인']]} value={filters.expiryType} onChange={v => updateF('expiryType', v)}/>
+          <MultiOpts opts={['예상 만기일','확정 만기일','미확인']} selected={filters.expiryType} onToggle={v => toggleArr('expiryType', v)}/>
         </FilterBtn>
         <FilterBtn label="📅 예상 만기일" k="expDate" openF={openF} setOpenF={setOpenF} hasValue={filters.expDateMin || filters.expDateMax}>
           <DateRange minVal={filters.expDateMin} maxVal={filters.expDateMax}
@@ -3358,25 +3365,25 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
             onMin={v => updateF('cfAreaMin', v)} onMax={v => updateF('cfAreaMax', v)} unit="평"/>
         </FilterBtn>}
         <FilterBtn label="딜 진행중" k="deal" openF={openF} setOpenF={setOpenF} hasValue={hasValue('deal')}>
-          <RadioOpts name="deal" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.deal} onChange={v => updateF('deal', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.deal} onToggle={v => toggleArr('deal', v)}/>
         </FilterBtn>
         {!onlyMy && <FilterBtn label="미관리 대상" k="inactive" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactive')}>
-          <RadioOpts name="inactive" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.inactive} onChange={v => updateF('inactive', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.inactive} onToggle={v => toggleArr('inactive', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="미관리 사유" k="inactiveReason" openF={openF} setOpenF={setOpenF} hasValue={hasValue('inactiveReason')}>
           <MultiOpts opts={['경쟁업체 부동산','임대인','폐업','기타']} selected={filters.inactiveReason} onToggle={v => toggleArr('inactiveReason', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="담당자 유무" k="manager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('manager')}>
-          <RadioOpts name="manager" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.manager} onChange={v => updateF('manager', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="핸드폰 유무" k="phone" openF={openF} setOpenF={setOpenF} hasValue={hasValue('phone')}>
-          <RadioOpts name="phone" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.phone} onChange={v => updateF('phone', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.phone} onToggle={v => toggleArr('phone', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="이메일 유무" k="email" openF={openF} setOpenF={setOpenF} hasValue={hasValue('email')}>
-          <RadioOpts name="email" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.email} onChange={v => updateF('email', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.email} onToggle={v => toggleArr('email', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="회사번호 유무" k="tel" openF={openF} setOpenF={setOpenF} hasValue={hasValue('tel')}>
-          <RadioOpts name="tel" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.tel} onChange={v => updateF('tel', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.tel} onToggle={v => toggleArr('tel', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="👤 세일즈 담당자" k="salesManager" openF={openF} setOpenF={setOpenF} hasValue={hasValue('salesManager')}>
           <MultiOpts opts={['장한덕','송승원','박환웅','박인하','주정호','임정수','최필규','정혜정','김민희','구민모']}
@@ -3877,9 +3884,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
   const [openF, setOpenF] = useState(null);
   const [filters, setFilters] = useState({
     name: '', status: [], grade: [], manager: [],
-    callSuccess: 'all', tip: 'all', recallDate: ['',''], lastContact: ['',''],
-    expDate: ['',''], cfDate: ['',''], expArea: ['',''], cfArea: ['',''],
-    led: 'all', mainContact: 'all', callCount: ['',''], expiryType: 'all',
+    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [],
   });
 
   const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
@@ -3890,13 +3895,11 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
       if (v.length === 2 && typeof v[0] === 'string' && (v[0] !== '' || v[1] !== '')) return true;
       return v.length > 0 && typeof v[0] !== 'string';
     }
-    return v && v !== 'all' && v !== '';
+    return v && v !== '';
   };
   const resetAll = () => setFilters({
     name: '', status: [], grade: [], manager: [],
-    callSuccess: 'all', tip: 'all', recallDate: ['',''], lastContact: ['',''],
-    expDate: ['',''], cfDate: ['',''], expArea: ['',''], cfArea: ['',''],
-    led: 'all', mainContact: 'all', callCount: ['',''], expiryType: 'all',
+    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [],
   });
 
   useEffect(() => {
@@ -3905,7 +3908,6 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
     return () => document.removeEventListener('click', h);
   }, []);
 
-  const parseNum = (s) => parseInt(String(s).replace(/[^0-9]/g,'')) || 0;
   const filtered = useMemo(() => {
     let arr = COLDCALLS.filter(c => {
       if (onlyMy && c.mgr !== '박지혜') return false;
@@ -3913,27 +3915,23 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
       if (filters.status.length > 0 && !filters.status.includes(c.st)) return false;
       if (filters.grade.length > 0 && !filters.grade.includes(c.cg)) return false;
       if (filters.manager.length > 0 && !filters.manager.includes(c.mgr)) return false;
-      if (filters.callSuccess !== 'all' && c.sc !== filters.callSuccess) return false;
-      if (filters.tip !== 'all' && c.tip !== filters.tip) return false;
-      if (filters.led !== 'all' && c.led !== filters.led) return false;
-      if (filters.mainContact !== 'all' && c.pd !== filters.mainContact) return false;
-      const ef = parseNum(c.ef), cf = parseNum(c.cf);
-      if (filters.expArea[0] && ef < +filters.expArea[0]) return false;
-      if (filters.expArea[1] && ef > +filters.expArea[1]) return false;
-      if (filters.cfArea[0] && cf < +filters.cfArea[0]) return false;
-      if (filters.cfArea[1] && cf > +filters.cfArea[1]) return false;
-      if (filters.callCount[0] && c.cnt < +filters.callCount[0]) return false;
-      if (filters.callCount[1] && c.cnt > +filters.callCount[1]) return false;
-      if (filters.expiryType === '예상' && c.em === '-') return false;
-      if (filters.expiryType === '확정' && c.cm === '-') return false;
-      if (filters.expiryType === '미확인' && (c.em !== '-' || c.cm !== '-')) return false;
+      if (filters.led.length > 0 && !filters.led.includes(c.led)) return false;
+      if (filters.mainContact.length > 0 && !filters.mainContact.includes(c.pd)) return false;
+      if (filters.recallDate[0] && (c.rc === '-' || c.rc < filters.recallDate[0].replace(/-/g, '.'))) return false;
+      if (filters.recallDate[1] && c.rc !== '-' && c.rc > filters.recallDate[1].replace(/-/g, '.')) return false;
+      // 만기일 (예상 또는 확정 중 어느 하나라도 범위 내)
+      if (filters.expDate[0] || filters.expDate[1]) {
+        const min = filters.expDate[0] ? filters.expDate[0].replace(/-/g, '.') : '';
+        const max = filters.expDate[1] ? filters.expDate[1].replace(/-/g, '.') : 'zzzz';
+        const dates = [c.em, c.cm].filter(d => d && d !== '-');
+        if (!dates.some(d => d >= min && d <= max)) return false;
+      }
       return true;
     });
     arr.sort((a, b) => {
       switch (sort) {
         case 'recallDate': return (a.rc === '-' ? 'zzz' : a.rc).localeCompare(b.rc === '-' ? 'zzz' : b.rc);
         case 'grade': return a.cg.localeCompare(b.cg);
-        case 'callCount': return b.cnt - a.cnt;
         case 'expiry': return (a.cm !== '-' ? a.cm : a.em).localeCompare(b.cm !== '-' ? b.cm : b.em);
         case 'name': return a.co.localeCompare(b.co, 'ko');
         case 'recent':
@@ -3961,7 +3959,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
         </div>
       </div>
 
-      {/* Filter row 1 */}
+      {/* Filter row 1 (핵심): 거래처명, 콜 상태, 거래처 등급, 콜 담당자 */}
       <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-100">
         <span className="text-[11px] text-slate-500 font-semibold mr-1">필터</span>
         <FilterBtn label="🔍 거래처명" k="cc-name" openF={openF} setOpenF={setOpenF} hasValue={hasV('name')}>
@@ -3971,63 +3969,39 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
         <FilterBtn label="콜 상태" k="cc-st" openF={openF} setOpenF={setOpenF} hasValue={hasV('status')}>
           <MultiOpts opts={['신규','통화완료','부재','번호오류','재콜예정','니즈확인','리드전환','종료']} selected={filters.status} onToggle={v => toggleArr('status', v)}/>
         </FilterBtn>
-        {!onlyMy && <FilterBtn label="☆ 거래처 등급" k="cc-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
+        <FilterBtn label="☆ 거래처 등급" k="cc-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
           <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
-        </FilterBtn>}
+        </FilterBtn>
         {!onlyMy && <FilterBtn label="콜 담당자" k="cc-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('manager')}>
           <MultiOpts opts={['박지혜','이민영','김현우','최서연']} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
         </FilterBtn>}
-        {!onlyMy && <FilterBtn label="통화 성공 여부" k="cc-sc" openF={openF} setOpenF={setOpenF} hasValue={hasV('callSuccess')}>
-          <RadioOpts name="cc-sc" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.callSuccess} onChange={v => updateF('callSuccess', v)}/>
-        </FilterBtn>}
-        <FilterBtn label="팁 유무" k="cc-tp" openF={openF} setOpenF={setOpenF} hasValue={hasV('tip')}>
-          <RadioOpts name="cc-tp" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.tip} onChange={v => updateF('tip', v)}/>
-        </FilterBtn>
-        {onlyMy && <FilterBtn label="만기일 구분" k="cc-mk" openF={openF} setOpenF={setOpenF} hasValue={hasV('expiryType')}>
-          <RadioOpts name="cc-mk" opts={[['all','전체'],['예상','예상 만기일'],['확정','확정 만기일'],['미확인','미확인']]} value={filters.expiryType} onChange={v => updateF('expiryType', v)}/>
-        </FilterBtn>}
-        {onlyMy && (
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
-            <option value="recallDate">재콜 예정일 임박순</option>
-            <option value="recent">최근 연락순</option>
-            <option value="expiry">만기일 임박순</option>
-            <option value="name">가나다순</option>
-          </select>
-        )}
       </div>
 
-      {!onlyMy && (
-        <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
-          <span className="text-[11px] text-slate-300 mr-1">　</span>
-          <FilterBtn label="예상 임차 면적(평)" k="cc-ef" openF={openF} setOpenF={setOpenF} hasValue={hasV('expArea')}>
-            <NumRange minVal={filters.expArea[0]} maxVal={filters.expArea[1]} onMin={v => updateF('expArea', [v, filters.expArea[1]])} onMax={v => updateF('expArea', [filters.expArea[0], v])} unit="평"/>
-          </FilterBtn>
-          <FilterBtn label="확정 임차 면적(평)" k="cc-cf" openF={openF} setOpenF={setOpenF} hasValue={hasV('cfArea')}>
-            <NumRange minVal={filters.cfArea[0]} maxVal={filters.cfArea[1]} onMin={v => updateF('cfArea', [v, filters.cfArea[1]])} onMax={v => updateF('cfArea', [filters.cfArea[0], v])} unit="평"/>
-          </FilterBtn>
-          <FilterBtn label="리드 전환 여부" k="cc-ld" openF={openF} setOpenF={setOpenF} hasValue={hasV('led')}>
-            <RadioOpts name="cc-ld" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.led} onChange={v => updateF('led', v)}/>
-          </FilterBtn>
-          <FilterBtn label="주담당자 연락처 유무" k="cc-pd" openF={openF} setOpenF={setOpenF} hasValue={hasV('mainContact')}>
-            <RadioOpts name="cc-pd" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.mainContact} onChange={v => updateF('mainContact', v)}/>
-          </FilterBtn>
-          <FilterBtn label="통화 횟수(회)" k="cc-cnt" openF={openF} setOpenF={setOpenF} hasValue={hasV('callCount')}>
-            <NumRange minVal={filters.callCount[0]} maxVal={filters.callCount[1]} onMin={v => updateF('callCount', [v, filters.callCount[1]])} onMax={v => updateF('callCount', [filters.callCount[0], v])} unit="회"/>
-          </FilterBtn>
-          <FilterBtn label="만기일 구분" k="cc-mk2" openF={openF} setOpenF={setOpenF} hasValue={hasV('expiryType')}>
-            <RadioOpts name="cc-mk2" opts={[['all','전체'],['예상','예상 만기일'],['확정','확정 만기일'],['미확인','미확인']]} value={filters.expiryType} onChange={v => updateF('expiryType', v)}/>
-          </FilterBtn>
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
-            <option value="recent">최근 연락순</option>
-            <option value="recallDate">재콜 예정일순</option>
-            <option value="grade">등급 높은순</option>
-            <option value="callCount">통화 횟수순</option>
-            <option value="name">가나다순</option>
-          </select>
-        </div>
-      )}
+      {/* Filter row 2 (상세): 재콜 예정일, 만기일, 리드 전환 여부, 주담당자 연락처 유무 */}
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-200">
+        <span className="text-[11px] text-slate-300 mr-1">　</span>
+        <FilterBtn label="📅 재콜 예정일" k="cc-rc" openF={openF} setOpenF={setOpenF} hasValue={hasV('recallDate')}>
+          <DateRange minVal={filters.recallDate[0]} maxVal={filters.recallDate[1]} onMin={v => updateF('recallDate', [v, filters.recallDate[1]])} onMax={v => updateF('recallDate', [filters.recallDate[0], v])}/>
+        </FilterBtn>
+        <FilterBtn label="📅 만기일" k="cc-exp" openF={openF} setOpenF={setOpenF} hasValue={hasV('expDate')}>
+          <DateRange minVal={filters.expDate[0]} maxVal={filters.expDate[1]} onMin={v => updateF('expDate', [v, filters.expDate[1]])} onMax={v => updateF('expDate', [filters.expDate[0], v])}/>
+        </FilterBtn>
+        <FilterBtn label="리드 전환 여부" k="cc-ld" openF={openF} setOpenF={setOpenF} hasValue={hasV('led')}>
+          <MultiOpts opts={['Y','N']} selected={filters.led} onToggle={v => toggleArr('led', v)}/>
+        </FilterBtn>
+        <FilterBtn label="주담당자 연락처 유무" k="cc-pd" openF={openF} setOpenF={setOpenF} hasValue={hasV('mainContact')}>
+          <MultiOpts opts={['Y','N']} selected={filters.mainContact} onToggle={v => toggleArr('mainContact', v)}/>
+        </FilterBtn>
+        <select value={sort} onChange={e => setSort(e.target.value)}
+          className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value="recent">최근 연락순</option>
+          <option value="recallDate">재콜 예정일 임박순</option>
+          <option value="expiry">만기일 임박순</option>
+          <option value="grade">등급 높은순</option>
+          <option value="name">가나다순</option>
+        </select>
+      </div>
+{/* DROP-OLD-ROW2-END */}
 
       <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
         <div className="font-semibold">총 <span className="text-rose-600 font-bold">{filtered.length}</span> 건 · {page}/{totalPages} 페이지</div>
@@ -4279,7 +4253,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
   const resetAll = () => setFilters({
     company:'', path:[], newType:[], genDate:['',''], manager:[], currentRegion:[], desiredRegion:[],
     expDate:['',''], contractDate:['',''], areaRange:['',''],
-    moveLikelihood:[], competitor:'all', progress:[],
+    moveLikelihood:[], competitor:[], progress:[],
   });
   useEffect(() => {
     const h = (e) => { if (!e.target.closest('.f-btn-wrap')) setOpenF(null); };
@@ -4350,7 +4324,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
           <input type="text" value={filters.company} onChange={e => updateF('company', e.target.value)}
             placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
         </FilterBtn>
-        <FilterBtn label="입입경로" k="dl-path" openF={openF} setOpenF={setOpenF} hasValue={hasV('path')}>
+        <FilterBtn label="인입 경로" k="dl-path" openF={openF} setOpenF={setOpenF} hasValue={hasV('path')}>
           <MultiOpts opts={DEAL_PATH_OPTIONS} selected={filters.path} onToggle={v => toggleArr('path', v)}/>
         </FilterBtn>
         {!onlyMy && <FilterBtn label="딜 상태" k="dl-nt" openF={openF} setOpenF={setOpenF} hasValue={hasV('newType')}>
@@ -4429,7 +4403,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
               <th className="px-3 py-2 text-left">거래처명</th>
               <th className="px-3 py-2 text-left">진행 단계</th>
               {!onlyMy && <th className="px-3 py-2 text-left">담당자</th>}
-              <th className="px-3 py-2 text-left">입입경로</th>
+              <th className="px-3 py-2 text-left">인입 경로</th>
               <th className="px-3 py-2 text-center">현재→희망</th>
               <th className="px-3 py-2 text-right">예상 면적</th>
               <th className="px-3 py-2 text-left">만기일</th>
@@ -4640,9 +4614,11 @@ const CONTRACT_STATUS_STYLES = {
   '갱신 협의': ['#FFF9E6', '#856404'],
 };
 const CONTRACT_TYPE_STYLES = {
-  '신규':     ['#EEEDFE', '#534AB7'],
-  '갱신':     ['#E1F5EE', '#085041'],
-  '확장 이전':['#FAEEDA', '#633806'],
+  '동일 면적 이전': ['#EEEDFE', '#534AB7'],
+  '재계약':         ['#E1F5EE', '#085041'],
+  '확장 이전':      ['#FAEEDA', '#633806'],
+  '축소 이전':      ['#FCEBEB', '#A32D2D'],
+  '추가 사무실':    ['#E6F1FB', '#042C53'],
 };
 
 const CONTRACTS = [
@@ -4759,14 +4735,30 @@ function ContractsPage({ onlyMy, onOpenContract }) {
           <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
         </FilterBtn>}
         {!onlyMy && <FilterBtn label="담당 세일즈" k="ct-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('manager')}>
-          <MultiOpts opts={['김민수','이수진','박준호','한소연','정대한']} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
+          <MultiOpts opts={DEAL_SALES_OPTIONS} selected={filters.manager} onToggle={v => toggleArr('manager', v)}/>
         </FilterBtn>}
         <FilterBtn label="권역" k="ct-rg" openF={openF} setOpenF={setOpenF} hasValue={hasV('region')}>
-          <MultiOpts opts={['CBD','GBD','YBD','기타']} selected={filters.region} onToggle={v => toggleArr('region', v)}/>
+          <MultiOpts opts={['CBD','GBD','YBD','마곡','성수','판교','기타']} selected={filters.region} onToggle={v => toggleArr('region', v)}/>
         </FilterBtn>
         <FilterBtn label="계약 유형" k="ct-tp" openF={openF} setOpenF={setOpenF} hasValue={hasV('cType')}>
-          <MultiOpts opts={['신규','갱신','확장 이전']} selected={filters.cType} onToggle={v => toggleArr('cType', v)}/>
+          <MultiOpts opts={['동일 면적 이전','재계약','확장 이전','축소 이전','추가 사무실']} selected={filters.cType} onToggle={v => toggleArr('cType', v)}/>
         </FilterBtn>
+        {onlyMy && <FilterBtn label="📅 계약 시작일" k="ct-ss-my" openF={openF} setOpenF={setOpenF} hasValue={hasV('startDate')}>
+          <DateRange minVal={filters.startDate[0]} maxVal={filters.startDate[1]} onMin={v => updateF('startDate', [v, filters.startDate[1]])} onMax={v => updateF('startDate', [filters.startDate[0], v])}/>
+        </FilterBtn>}
+        {onlyMy && <FilterBtn label="📅 만기일" k="ct-se-my" openF={openF} setOpenF={setOpenF} hasValue={hasV('endDate')}>
+          <DateRange minVal={filters.endDate[0]} maxVal={filters.endDate[1]} onMin={v => updateF('endDate', [v, filters.endDate[1]])} onMax={v => updateF('endDate', [filters.endDate[0], v])}/>
+        </FilterBtn>}
+        {onlyMy && <FilterBtn label="계약 면적(평)" k="ct-ar-my" openF={openF} setOpenF={setOpenF} hasValue={hasV('areaRange')}>
+          <NumRange minVal={filters.areaRange[0]} maxVal={filters.areaRange[1]} onMin={v => updateF('areaRange', [v, filters.areaRange[1]])} onMax={v => updateF('areaRange', [filters.areaRange[0], v])} unit="평"/>
+        </FilterBtn>}
+        {onlyMy && <FilterBtn label="빌딩명" k="ct-bld-my" openF={openF} setOpenF={setOpenF} hasValue={hasV('building')}>
+          <input type="text" value={filters.building} onChange={e => updateF('building', e.target.value)}
+            placeholder="빌딩명 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>}
+        {onlyMy && <FilterBtn label="수수료(만원)" k="ct-fee-my" openF={openF} setOpenF={setOpenF} hasValue={hasV('rentRange')}>
+          <NumRange minVal={filters.rentRange[0]} maxVal={filters.rentRange[1]} onMin={v => updateF('rentRange', [v, filters.rentRange[1]])} onMax={v => updateF('rentRange', [filters.rentRange[0], v])} unit="만원"/>
+        </FilterBtn>}
         {onlyMy && (
           <select value={sort} onChange={e => setSort(e.target.value)}
             className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
@@ -4784,7 +4776,7 @@ function ContractsPage({ onlyMy, onOpenContract }) {
           <FilterBtn label="📅 계약 시작일" k="ct-ss" openF={openF} setOpenF={setOpenF} hasValue={hasV('startDate')}>
             <DateRange minVal={filters.startDate[0]} maxVal={filters.startDate[1]} onMin={v => updateF('startDate', [v, filters.startDate[1]])} onMax={v => updateF('startDate', [filters.startDate[0], v])}/>
           </FilterBtn>
-          <FilterBtn label="📅 계약 종료일" k="ct-se" openF={openF} setOpenF={setOpenF} hasValue={hasV('endDate')}>
+          <FilterBtn label="📅 만기일" k="ct-se" openF={openF} setOpenF={setOpenF} hasValue={hasV('endDate')}>
             <DateRange minVal={filters.endDate[0]} maxVal={filters.endDate[1]} onMin={v => updateF('endDate', [v, filters.endDate[1]])} onMax={v => updateF('endDate', [filters.endDate[0], v])}/>
           </FilterBtn>
           <FilterBtn label="계약 면적(평)" k="ct-ar" openF={openF} setOpenF={setOpenF} hasValue={hasV('areaRange')}>
@@ -4794,11 +4786,7 @@ function ContractsPage({ onlyMy, onOpenContract }) {
             <input type="text" value={filters.building} onChange={e => updateF('building', e.target.value)}
               placeholder="빌딩명 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
           </FilterBtn>
-          <FilterBtn label="딜 ID" k="ct-did" openF={openF} setOpenF={setOpenF} hasValue={hasV('dealId')}>
-            <input type="text" value={filters.dealId} onChange={e => updateF('dealId', e.target.value)}
-              placeholder="LD-2025-..." className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
-          </FilterBtn>
-          <FilterBtn label="월 임대료(만원)" k="ct-rent" openF={openF} setOpenF={setOpenF} hasValue={hasV('rentRange')}>
+          <FilterBtn label="수수료(만원)" k="ct-rent" openF={openF} setOpenF={setOpenF} hasValue={hasV('rentRange')}>
             <NumRange minVal={filters.rentRange[0]} maxVal={filters.rentRange[1]} onMin={v => updateF('rentRange', [v, filters.rentRange[1]])} onMax={v => updateF('rentRange', [filters.rentRange[0], v])} unit="만원"/>
           </FilterBtn>
           <select value={sort} onChange={e => setSort(e.target.value)}
@@ -5364,8 +5352,8 @@ function HomeDashboard({ onNavigate }) {
     const totalCount = CONTRACTS.length;
     // 수수료 = 보증금의 1% 가정 / 또는 임대료 1개월
     const totalFee = CONTRACTS.reduce((s, c) => s + (c.rentNum || 0), 0);
-    const newCount = CONTRACTS.filter(c => c.type === '신규').length;
-    const renewCount = CONTRACTS.filter(c => c.type === '갱신').length;
+    const newCount = CONTRACTS.filter(c => c.type === '동일 면적 이전' || c.type === '확장 이전' || c.type === '축소 이전' || c.type === '추가 사무실').length;
+    const renewCount = CONTRACTS.filter(c => c.type === '재계약').length;
     return { thisMonth, totalArea, totalCount, totalFee, newCount, renewCount };
   }, []);
 
@@ -5546,7 +5534,7 @@ function HomeDashboard({ onNavigate }) {
             <div className="text-[12px] text-slate-500 mb-1.5">총 계약 건수</div>
             <div className="text-[28px] font-medium leading-none text-emerald-600">{contractStats.totalCount}</div>
             <div className="text-[12px] text-slate-500 mt-1">건</div>
-            <div className="mt-2.5 text-[11px] text-slate-500">신규 <strong className="text-emerald-600">{contractStats.newCount}건</strong> · 갱신 <strong className="text-emerald-600">{contractStats.renewCount}건</strong></div>
+            <div className="mt-2.5 text-[11px] text-slate-500">이전/증평 <strong className="text-emerald-600">{contractStats.newCount}건</strong> · 재계약 <strong className="text-emerald-600">{contractStats.renewCount}건</strong></div>
           </div>
           <div className="bg-white rounded-lg p-4 border border-slate-100">
             <div className="text-[12px] text-slate-500 mb-1.5">월 임대료 총액</div>
