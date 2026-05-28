@@ -3884,7 +3884,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
   const [openF, setOpenF] = useState(null);
   const [filters, setFilters] = useState({
     name: '', status: [], grade: [], manager: [],
-    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [],
+    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [], phone: [], email: [], tel: [],
   });
 
   const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
@@ -3899,7 +3899,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
   };
   const resetAll = () => setFilters({
     name: '', status: [], grade: [], manager: [],
-    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [],
+    recallDate: ['',''], expDate: ['',''], led: [], mainContact: [], phone: [], email: [], tel: [],
   });
 
   useEffect(() => {
@@ -3917,6 +3917,9 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
       if (filters.manager.length > 0 && !filters.manager.includes(c.mgr)) return false;
       if (filters.led.length > 0 && !filters.led.includes(c.led)) return false;
       if (filters.mainContact.length > 0 && !filters.mainContact.includes(c.pd)) return false;
+      if (filters.phone.length > 0 && !filters.phone.includes(c.pd)) return false;
+      if (filters.email.length > 0 && !filters.email.includes(c.pd)) return false;
+      if (filters.tel.length > 0 && !filters.tel.includes(c.pd)) return false;
       if (filters.recallDate[0] && (c.rc === '-' || c.rc < filters.recallDate[0].replace(/-/g, '.'))) return false;
       if (filters.recallDate[1] && c.rc !== '-' && c.rc > filters.recallDate[1].replace(/-/g, '.')) return false;
       // 만기일 (예상 또는 확정 중 어느 하나라도 범위 내)
@@ -3989,8 +3992,17 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
         <FilterBtn label="리드 전환 여부" k="cc-ld" openF={openF} setOpenF={setOpenF} hasValue={hasV('led')}>
           <MultiOpts opts={['Y','N']} selected={filters.led} onToggle={v => toggleArr('led', v)}/>
         </FilterBtn>
-        <FilterBtn label="주담당자 연락처 유무" k="cc-pd" openF={openF} setOpenF={setOpenF} hasValue={hasV('mainContact')}>
+        <FilterBtn label="담당자 유무" k="cc-pd" openF={openF} setOpenF={setOpenF} hasValue={hasV('mainContact')}>
           <MultiOpts opts={['Y','N']} selected={filters.mainContact} onToggle={v => toggleArr('mainContact', v)}/>
+        </FilterBtn>
+        <FilterBtn label="핸드폰 유무" k="cc-ph" openF={openF} setOpenF={setOpenF} hasValue={hasV('phone')}>
+          <MultiOpts opts={['Y','N']} selected={filters.phone} onToggle={v => toggleArr('phone', v)}/>
+        </FilterBtn>
+        <FilterBtn label="이메일 유무" k="cc-em" openF={openF} setOpenF={setOpenF} hasValue={hasV('email')}>
+          <MultiOpts opts={['Y','N']} selected={filters.email} onToggle={v => toggleArr('email', v)}/>
+        </FilterBtn>
+        <FilterBtn label="회사번호 유무" k="cc-tel" openF={openF} setOpenF={setOpenF} hasValue={hasV('tel')}>
+          <MultiOpts opts={['Y','N']} selected={filters.tel} onToggle={v => toggleArr('tel', v)}/>
         </FilterBtn>
         <select value={sort} onChange={e => setSort(e.target.value)}
           className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
