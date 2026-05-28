@@ -4101,7 +4101,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
               {!onlyMy && <th className="px-3 py-2 text-left">콜 담당자</th>}
               <th className="px-3 py-2 text-left">최근 연락일</th>
               {!onlyMy && <th className="px-3 py-2 text-center w-16">통화 성공</th>}
-              <th className="px-3 py-2 text-center w-12">팁</th>
+              <th className="px-3 py-2 text-center w-12">메모</th>
               <th className="px-3 py-2 text-left">재콜 예정일</th>
               <th className="px-3 py-2 text-center w-14">횟수</th>
               <th className="px-3 py-2 text-center w-24">상세</th>
@@ -4214,7 +4214,7 @@ function ColdcallDetailBody({ c, hideHeader }) {
         <KV k="통화 성공" v={c.sc} tone={c.sc === 'Y' ? 'g' : ''}/>
         <KV k="통화 횟수" v={`${c.cnt}회`}/>
         <KV k="재콜 예정일" v={c.rc !== '-' ? c.rc : '미등록'} tone={c.rc !== '-' ? 'w' : ''}/>
-        <KV k="팁 유무" v={c.tip} tone={c.tip === 'Y' ? 'g' : ''}/>
+        <KV k="메모 유무" v={c.tip} tone={c.tip === 'Y' ? 'g' : ''}/>
         <KV k="리드 전환" v={c.led} tone={c.led === 'Y' ? 'g' : ''}/>
         <KV k="주담당자 연락처" v={c.pd} tone={c.pd === 'Y' ? 'g' : ''}/>
       </div>
