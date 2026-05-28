@@ -4250,7 +4250,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
   const [filters, setFilters] = useState({
     company:'', path:[], newType:[], genDate:['',''], manager:[], currentRegion:[], desiredRegion:[],
     expDate:['',''], contractDate:['',''], areaRange:['',''],
-    moveLikelihood:[], competitor:'all', progress:[],
+    moveLikelihood:[], competitor:[], progress:[],
   });
   const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
   const toggleArr = (k, v) => setFilters(p => ({ ...p, [k]: p[k].includes(v) ? p[k].filter(x => x !== v) : [...p[k], v] }));
@@ -4283,7 +4283,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
       if (filters.currentRegion.length > 0 && !filters.currentRegion.includes(d.currentRegion)) return false;
       if (filters.desiredRegion.length > 0 && !filters.desiredRegion.includes(d.desiredRegion)) return false;
       if (filters.moveLikelihood.length > 0 && !filters.moveLikelihood.includes(d.moveLikelihood)) return false;
-      if (filters.competitor !== 'all' && d.competitor !== filters.competitor) return false;
+      if (filters.competitor.length > 0 && !filters.competitor.includes(d.competitor)) return false;
       if (filters.progress.length > 0 && !filters.progress.includes(d.progress)) return false;
       const a = parseNum(d.area);
       if (filters.areaRange[0] && a < +filters.areaRange[0]) return false;
@@ -4382,7 +4382,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
             <MultiOpts opts={DEAL_MOVE_LIKELIHOOD} selected={filters.moveLikelihood} onToggle={v => toggleArr('moveLikelihood', v)}/>
           </FilterBtn>
           <FilterBtn label="경쟁 부동산" k="dl-cmp" openF={openF} setOpenF={setOpenF} hasValue={hasV('competitor')}>
-            <RadioOpts name="dl-cmp" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.competitor} onChange={v => updateF('competitor', v)}/>
+            <MultiOpts opts={['Y','N']} selected={Array.isArray(filters.competitor) ? filters.competitor : []} onToggle={v => toggleArr('competitor', v)}/>
           </FilterBtn>
           <FilterBtn label="진행 단계" k="dl-pg" openF={openF} setOpenF={setOpenF} hasValue={hasV('progress')}>
             <MultiOpts opts={DEAL_PROGRESS_STAGES} selected={filters.progress} onToggle={v => toggleArr('progress', v)}/>
@@ -5058,16 +5058,15 @@ function ContactsPage({ onOpenContact, onOpenCompany }) {
       if (filters.name && !c.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
       if (filters.company && !c.co.toLowerCase().includes(filters.company.toLowerCase())) return false;
       if (filters.grade.length > 0 && !filters.grade.includes(c.coGrade)) return false;
-      if (filters.role !== 'all' && c.role !== filters.role) return false;
-      if (filters.ourMgr.length > 0 && !filters.ourMgr.includes(c.ourMgr)) return false;
-      if (filters.title && !c.title.toLowerCase().includes(filters.title.toLowerCase())) return false;
-      if (filters.phone === 'Y' && !c.hasPhone) return false;
-      if (filters.phone === 'N' && c.hasPhone) return false;
-      if (filters.email === 'Y' && !c.hasEmail) return false;
-      if (filters.email === 'N' && c.hasEmail) return false;
-      const lc = c.lastContact.replace(/\./g, '-');
-      if (filters.lastContact[0] && lc < filters.lastContact[0]) return false;
-      if (filters.lastContact[1] && lc > filters.lastContact[1]) return false;
+      if (filters.role.length > 0 && !filters.role.includes(c.role)) return false;
+      if (filters.phone.length > 0) {
+        const v = c.hasPhone ? 'Y' : 'N';
+        if (!filters.phone.includes(v)) return false;
+      }
+      if (filters.email.length > 0) {
+        const v = c.hasEmail ? 'Y' : 'N';
+        if (!filters.email.includes(v)) return false;
+      }
       return true;
     });
     arr.sort((a, b) => {
@@ -5113,23 +5112,13 @@ function ContactsPage({ onOpenContact, onOpenCompany }) {
           <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
         </FilterBtn>
         <FilterBtn label="담당 구분" k="ct2-rl" openF={openF} setOpenF={setOpenF} hasValue={hasV('role')}>
-          <RadioOpts name="ct2-rl" opts={[['all','전체'],['주담당','주담당'],['실무','실무'],['보조','보조']]} value={filters.role} onChange={v => updateF('role', v)}/>
-        </FilterBtn>
-        <FilterBtn label="담당 세일즈" k="ct2-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('ourMgr')}>
-          <MultiOpts opts={['김민수','이수진','박준호','한소연','정대한','최지원']} selected={filters.ourMgr} onToggle={v => toggleArr('ourMgr', v)}/>
-        </FilterBtn>
-        <FilterBtn label="직책 키워드" k="ct2-tt" openF={openF} setOpenF={setOpenF} hasValue={hasV('title')}>
-          <input type="text" value={filters.title} onChange={e => updateF('title', e.target.value)}
-            placeholder="직책 검색 (예: 팀장)" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
-        </FilterBtn>
-        <FilterBtn label="📅 최근 연락일" k="ct2-lc" openF={openF} setOpenF={setOpenF} hasValue={hasV('lastContact')}>
-          <DateRange minVal={filters.lastContact[0]} maxVal={filters.lastContact[1]} onMin={v => updateF('lastContact', [v, filters.lastContact[1]])} onMax={v => updateF('lastContact', [filters.lastContact[0], v])}/>
+          <MultiOpts opts={['주담당','실무','보조']} selected={filters.role} onToggle={v => toggleArr('role', v)}/>
         </FilterBtn>
         <FilterBtn label="핸드폰 유무" k="ct2-ph" openF={openF} setOpenF={setOpenF} hasValue={hasV('phone')}>
-          <RadioOpts name="ct2-ph" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.phone} onChange={v => updateF('phone', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.phone} onToggle={v => toggleArr('phone', v)}/>
         </FilterBtn>
         <FilterBtn label="이메일 유무" k="ct2-em" openF={openF} setOpenF={setOpenF} hasValue={hasV('email')}>
-          <RadioOpts name="ct2-em" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.email} onChange={v => updateF('email', v)}/>
+          <MultiOpts opts={['Y','N']} selected={filters.email} onToggle={v => toggleArr('email', v)}/>
         </FilterBtn>
         <select value={sort} onChange={e => setSort(e.target.value)}
           className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
