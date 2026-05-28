@@ -1019,23 +1019,33 @@ function GenstarMate() {
           <CompaniesPage onlyMy={pageView === 'companiesMy'}
             onOpenDetail={(id) => { setSelectedCompanyId(id); setPreviousView(pageView); setPageView('companyDetail'); }} />
         ) : pageView === 'companyDetail' ? (
-          <CompanyDetailPage companyId={selectedCompanyId} onBack={() => setPageView(previousView)} />
+          <CompanyDetailPage companyId={selectedCompanyId}
+            onBack={() => setPageView(previousView)}
+            onOpenColdcall={(id) => { setSelectedColdcallId(id); setPreviousView('companyDetail'); setPageView('coldcallDetail'); }}
+            onOpenDeal={(id) => { setSelectedDealId(id); setPreviousView('companyDetail'); setPageView('dealDetail'); }}
+            onOpenContract={(id) => { setSelectedContractId(id); setPreviousView('companyDetail'); setPageView('contractDetail'); }} />
         ) : pageView === 'coldcallAll' || pageView === 'coldcallMy' ? (
           <ColdcallPage onlyMy={pageView === 'coldcallMy'}
             onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView(pageView); setPageView('companyDetail'); }}
             onOpenColdcall={(id) => { setSelectedColdcallId(id); setPreviousView(pageView); setPageView('coldcallDetail'); }}/>
         ) : pageView === 'coldcallDetail' ? (
-          <ColdcallDetailPage coldcallId={selectedColdcallId} onBack={() => setPageView(previousView)} />
+          <ColdcallDetailPage coldcallId={selectedColdcallId}
+            onBack={() => setPageView(previousView)}
+            onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('coldcallDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'dealsAll' || pageView === 'dealsMy' ? (
           <DealsPage onlyMy={pageView === 'dealsMy'}
             onOpenDeal={(id) => { setSelectedDealId(id); setPreviousView(pageView); setPageView('dealDetail'); }}/>
         ) : pageView === 'dealDetail' ? (
-          <DealDetailPage dealId={selectedDealId} onBack={() => setPageView(previousView)} />
+          <DealDetailPage dealId={selectedDealId}
+            onBack={() => setPageView(previousView)}
+            onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('dealDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'contractsAll' || pageView === 'contractsMy' ? (
           <ContractsPage onlyMy={pageView === 'contractsMy'}
             onOpenContract={(id) => { setSelectedContractId(id); setPreviousView(pageView); setPageView('contractDetail'); }}/>
         ) : pageView === 'contractDetail' ? (
-          <ContractDetailPage contractId={selectedContractId} onBack={() => setPageView(previousView)} />
+          <ContractDetailPage contractId={selectedContractId}
+            onBack={() => setPageView(previousView)}
+            onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('contractDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'home' ? (
           <HomeDashboard onNavigate={setPageView}/>
         ) : pageView === 'contactsAll' ? (
@@ -3094,7 +3104,22 @@ const COMPANIES = [
   {id:12,n:'이마트(주)',g:'A',구:'법인사업자',규:'대기업',종:'약 9,200명',사:'본사',지:'Y',국:'국내',예:'2025.06.30',예유:'Y',예면:'2,800',현:'2,500',확만:'2025.06.30',확임:'2,500',딜:'Y',계:'N',비:'N',비사:'-',주확:'2025.01.18',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'정대한',접:'2025.01.28',니:true,주소:'서울 성동구 아차산로17길 48',빌:'이마트 성수',보:'76억 원',임:'2,300만 원/월',이유:'본사 재편',ct:[{n:'강민호',t:'시설관리팀장',p:'010-****-7788',r:'주담당',lc:'2025.01.28'}],cl:[{d:'2025.01.28',by:'박지혜',res:'ok',m:'도심권 이전 적극 검토'}],dl:[{id:'LD-2025-003',nm:'이마트 본사 재편이전',st:'진행중',mgr:'정대한',area:'2,800평'}],my:false},
   {id:13,n:'한화생명',g:'C',구:'법인사업자',규:'대기업',종:'약 7,600명',사:'본사',지:'Y',국:'국내',예:'2026.12.31',예유:'Y',예면:'3,800',현:'3,600',확만:'-',확임:'-',딜:'N',계:'Y',비:'N',비사:'-',주확:'2024.12.01',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'이수진',접:'2024.12.20',니:false,주소:'서울 영등포구 여의대로 56',빌:'한화생명 63빌딩',보:'130억 원',임:'4,200만 원/월',이유:'-',ct:[{n:'윤서영',t:'총무팀 차장',p:'010-****-9900',r:'주담당',lc:'2024.12.20'}],cl:[{d:'2024.12.20',by:'이민영',res:'ok',m:'현재 이전 없음, 장기 모니터링'}],dl:[],my:false},
   {id:14,n:'KT DS(주)',g:'B',구:'법인사업자',규:'중견기업',종:'약 1,800명',사:'본사',지:'N',국:'국내',예:'2025.10.31',예유:'Y',예면:'1,100',현:'950',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2025.01.08',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'김민수',접:'2025.01.15',니:true,주소:'서울 서초구 태봉로 151',빌:'KT 연구개발센터',보:'31억 원',임:'950만 원/월',이유:'본사 이전',ct:[{n:'조현민',t:'시설팀 대리',p:'010-****-2211',r:'주담당',lc:'2025.01.15'}],cl:[{d:'2025.01.15',by:'박지혜',res:'ok',m:'강남 이전 검토 중'}],dl:[],my:false},
-  {id:15,n:'두산인프라코어',g:'F',구:'법인사업자',규:'중견기업',종:'약 3,000명',사:'본사',지:'Y',국:'국내',예:'-',예유:'N',예면:'-',현:'1,650',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2024.08.20',고:'N',주담:'N',폰:'N',메:'N',회:'Y',담:'박준호',접:'2024.08.20',니:false,주소:'서울 동대문구 장안동 산 57',빌:'두산인프라코어 사옥',보:'48억 원',임:'1,300만 원/월',이유:'-',ct:[],cl:[{d:'2024.08.20',by:'이민영',res:'ms',m:'연락처 확인 필요'}],dl:[],my:false}
+  {id:15,n:'두산인프라코어',g:'F',구:'법인사업자',규:'중견기업',종:'약 3,000명',사:'본사',지:'Y',국:'국내',예:'-',예유:'N',예면:'-',현:'1,650',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2024.08.20',고:'N',주담:'N',폰:'N',메:'N',회:'Y',담:'박준호',접:'2024.08.20',니:false,주소:'서울 동대문구 장안동 산 57',빌:'두산인프라코어 사옥',보:'48억 원',임:'1,300만 원/월',이유:'-',ct:[],cl:[{d:'2024.08.20',by:'이민영',res:'ms',m:'연락처 확인 필요'}],dl:[],my:false},
+  {id:16,n:'토스(비바리퍼블리카)',g:'A',구:'법인사업자',규:'대기업',종:'약 1,800명',사:'본사',지:'N',국:'국내',예:'2025.05.31',예유:'Y',예면:'2,400',현:'2,100',확만:'2025.05.31',확임:'2,400',딜:'Y',계:'N',비:'N',비사:'-',주확:'2025.02.05',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'이수진',접:'2025.02.12',니:true,주소:'서울 강남구 테헤란로 142',빌:'아크플레이스',보:'70억 원',임:'2,100만 원/월',이유:'본사 확장',ct:[{n:'서민지',t:'People팀 매니저',p:'010-****-7711',r:'주담당',lc:'2025.02.12'}],cl:[{d:'2025.02.12',by:'박지혜',res:'ok',m:'GBD 확장 이전 검토'}],dl:[{id:'LD-2025-009',nm:'토스 본사 확장이전',st:'협의중',mgr:'이수진',area:'2,400평'}],my:true},
+  {id:17,n:'당근마켓',g:'B',구:'법인사업자',규:'중견기업',종:'약 600명',사:'본사',지:'N',국:'국내',예:'2025.09.30',예유:'Y',예면:'1,400',현:'1,200',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2025.01.22',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'김민희',접:'2025.02.03',니:true,주소:'서울 서초구 강남대로 311',빌:'한화금융센터 서초',보:'42억 원',임:'1,250만 원/월',이유:'성장 확장',ct:[{n:'한지윤',t:'운영팀 리더',p:'010-****-4422',r:'주담당',lc:'2025.02.03'}],cl:[{d:'2025.02.03',by:'박지혜',res:'ok',m:'강남권 1,500평 검토'}],dl:[],my:true},
+  {id:18,n:'아모레퍼시픽',g:'C',구:'법인사업자',규:'대기업',종:'약 6,200명',사:'본사',지:'Y',국:'국내',예:'2026.04.30',예유:'Y',예면:'3,800',현:'3,600',확만:'-',확임:'-',딜:'N',계:'Y',비:'N',비사:'-',주확:'2024.10.15',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'정혜정',접:'2024.12.18',니:false,주소:'서울 용산구 한강대로 100',빌:'아모레퍼시픽 본사',보:'140억 원',임:'4,500만 원/월',이유:'-',ct:[{n:'배성훈',t:'GA담당 부장',p:'010-****-2266',r:'주담당',lc:'2024.12.18'}],cl:[{d:'2024.12.18',by:'이민영',res:'ok',m:'현재 자가 사옥, 모니터링'}],dl:[],my:false},
+  {id:19,n:'딜리버리히어로코리아',g:'A',구:'법인사업자',규:'대기업',종:'약 2,400명',사:'지점',지:'N',국:'글로벌',예:'2025.06.30',예유:'Y',예면:'1,600',현:'1,450',확만:'2025.06.30',확임:'1,600',딜:'Y',계:'N',비:'N',비사:'-',주확:'2025.01.30',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'주정호',접:'2025.02.09',니:true,주소:'서울 서초구 서초대로 411',빌:'서초GT타워',보:'52억 원',임:'1,580만 원/월',이유:'본사 이전',ct:[{n:'박세린',t:'People Ops',p:'010-****-8855',r:'주담당',lc:'2025.02.09'}],cl:[{d:'2025.02.09',by:'박지혜',res:'ok',m:'서초/강남 1500평 검토'},{d:'2025.01.20',by:'박지혜',res:'ok',m:'만기 6월 확정'}],dl:[{id:'LD-2025-010',nm:'딜리버리히어로 서초 이전',st:'제안완료',mgr:'주정호',area:'1,600평'}],my:false},
+  {id:20,n:'무신사',g:'B',구:'법인사업자',규:'중견기업',종:'약 1,200명',사:'본사',지:'N',국:'국내',예:'2025.11.30',예유:'Y',예면:'2,000',현:'1,750',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2025.01.18',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'박환웅',접:'2025.01.28',니:true,주소:'서울 성동구 아차산로 113',빌:'무신사 캠퍼스 N1',보:'58억 원',임:'1,800만 원/월',이유:'캠퍼스 확장',ct:[{n:'조유나',t:'스페이스팀 리드',p:'010-****-9911',r:'주담당',lc:'2025.01.28'}],cl:[{d:'2025.01.28',by:'박지혜',res:'ok',m:'성수동 일대 추가 캠퍼스 검토'}],dl:[],my:true},
+  {id:21,n:'미래에셋자산운용',g:'A',구:'법인사업자',규:'대기업',종:'약 950명',사:'본사',지:'N',국:'국내',예:'2025.08.31',예유:'Y',예면:'1,500',현:'1,380',확만:'2025.08.31',확임:'1,500',딜:'Y',계:'N',비:'N',비사:'-',주확:'2025.02.01',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'송승원',접:'2025.02.11',니:true,주소:'서울 중구 을지로 5길 26',빌:'미래에셋센터원',보:'68억 원',임:'1,950만 원/월',이유:'본사 이전',ct:[{n:'장영석',t:'총무팀 부장',p:'010-****-3399',r:'주담당',lc:'2025.02.11'}],cl:[{d:'2025.02.11',by:'박지혜',res:'ok',m:'CBD 내 이전 적극 검토'}],dl:[{id:'LD-2025-011',nm:'미래에셋운용 CBD 이전',st:'협의중',mgr:'송승원',area:'1,500평'}],my:false},
+  {id:22,n:'리디(주)',g:'C',구:'법인사업자',규:'중소기업',종:'약 320명',사:'본사',지:'N',국:'국내',예:'2026.02.28',예유:'Y',예면:'700',현:'620',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2024.11.20',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'최필규',접:'2025.01.05',니:false,주소:'서울 강남구 강남대로 374',빌:'케이스퀘어 강남II',보:'18억 원',임:'520만 원/월',이유:'-',ct:[{n:'권다현',t:'경영지원 과장',p:'010-****-1188',r:'주담당',lc:'2025.01.05'}],cl:[{d:'2025.01.05',by:'이민영',res:'ok',m:'현재 이전 계획 없음'}],dl:[],my:false},
+  {id:23,n:'야놀자',g:'B',구:'법인사업자',규:'중견기업',종:'약 1,600명',사:'본사',지:'N',국:'국내',예:'2025.10.31',예유:'Y',예면:'2,200',현:'1,950',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2025.01.15',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'구민모',접:'2025.01.22',니:true,주소:'서울 강남구 테헤란로 423',빌:'GS타워',보:'62억 원',임:'1,900만 원/월',이유:'사옥 확장',ct:[{n:'문서연',t:'시설팀 매니저',p:'010-****-6644',r:'주담당',lc:'2025.01.22'}],cl:[{d:'2025.01.22',by:'박지혜',res:'ok',m:'테헤란 일대 2000평 이상 검토'}],dl:[],my:true},
+  {id:24,n:'대한항공',g:'D',구:'법인사업자',규:'대기업',종:'약 18,500명',사:'본사',지:'Y',국:'국내',예:'-',예유:'N',예면:'-',현:'5,400',확만:'-',확임:'-',딜:'N',계:'N',비:'Y',비사:'경쟁업체 부동산',주확:'2024.07.10',고:'N',주담:'N',폰:'N',메:'N',회:'Y',담:'박환웅',접:'2024.07.10',니:false,주소:'서울 강서구 하늘길 260',빌:'대한항공 본사',보:'180억 원',임:'5,800만 원/월',이유:'-',ct:[],cl:[{d:'2024.07.10',by:'이민영',res:'ms',m:'경쟁업체 전속 — 미관리 처리'}],dl:[],my:false},
+  {id:25,n:'스튜디오드래곤',g:'C',구:'법인사업자',규:'중견기업',종:'약 380명',사:'본사',지:'N',국:'국내',예:'2026.08.31',예유:'Y',예면:'1,100',현:'980',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2024.12.05',고:'Y',주담:'Y',폰:'N',메:'Y',회:'Y',담:'정혜정',접:'2024.12.20',니:false,주소:'서울 마포구 매봉산로 75',빌:'상암 DMC타워',보:'28억 원',임:'820만 원/월',이유:'-',ct:[{n:'유태경',t:'경영기획 차장',p:'-',r:'주담당',lc:'2024.12.20'}],cl:[{d:'2024.12.20',by:'이민영',res:'ok',m:'2026년 이후 이전 검토 예정'}],dl:[],my:false},
+  {id:26,n:'직방',g:'B',구:'법인사업자',규:'중견기업',종:'약 700명',사:'본사',지:'N',국:'국내',예:'2025.07.31',예유:'Y',예면:'1,300',현:'1,150',확만:'2025.07.31',확임:'1,300',딜:'Y',계:'Y',비:'N',비사:'-',주확:'2025.02.04',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'박인하',접:'2025.02.13',니:true,주소:'서울 서초구 강남대로 465',빌:'교보타워',보:'45억 원',임:'1,350만 원/월',이유:'본사 이전',ct:[{n:'홍성민',t:'GA팀장',p:'010-****-2277',r:'주담당',lc:'2025.02.13'}],cl:[{d:'2025.02.13',by:'박지혜',res:'ok',m:'GBD 1300평 이전 확정'},{d:'2025.01.27',by:'박지혜',res:'ok',m:'7월 만기 확정'}],dl:[{id:'LD-2025-012',nm:'직방 GBD 이전',st:'계약진행',mgr:'박인하',area:'1,300평'}],my:false},
+  {id:27,n:'한국타이어앤테크놀로지',g:'D',구:'법인사업자',규:'대기업',종:'약 7,800명',사:'본사',지:'Y',국:'국내',예:'-',예유:'N',예면:'-',현:'4,200',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2024.06.18',고:'Y',주담:'N',폰:'N',메:'Y',회:'Y',담:'주정호',접:'2024.06.18',니:false,주소:'서울 강남구 테헤란로 133',빌:'한국타이어빌딩',보:'118억 원',임:'3,600만 원/월',이유:'-',ct:[{n:'안진우',t:'GA팀',p:'-',r:'실무',lc:'2024.06.18'}],cl:[{d:'2024.06.18',by:'이민영',res:'ok',m:'장기 자가 운영'}],dl:[],my:false},
+  {id:28,n:'화이자코리아',g:'A',구:'법인사업자',규:'대기업',종:'약 850명',사:'지점',지:'N',국:'글로벌',예:'2025.04.30',예유:'Y',예면:'1,800',현:'1,650',확만:'2025.04.30',확임:'1,800',딜:'Y',계:'N',비:'N',비사:'-',주확:'2025.02.06',고:'Y',주담:'Y',폰:'Y',메:'Y',회:'Y',담:'임정수',접:'2025.02.14',니:true,주소:'서울 영등포구 국제금융로 10',빌:'IFC서울 3타워',보:'72억 원',임:'2,250만 원/월',이유:'본사 확장',ct:[{n:'케이트 박',t:'Facility Mgr',p:'010-****-5533',r:'주담당',lc:'2025.02.14'}],cl:[{d:'2025.02.14',by:'박지혜',res:'ok',m:'4월 만기, 여의도 잔류 우선'}],dl:[{id:'LD-2025-013',nm:'화이자 IFC 재계약',st:'협의중',mgr:'임정수',area:'1,800평'}],my:true},
+  {id:29,n:'마켓컬리',g:'C',구:'법인사업자',규:'중견기업',종:'약 1,300명',사:'본사',지:'N',국:'국내',예:'2025.12.31',예유:'Y',예면:'1,700',현:'1,500',확만:'-',확임:'-',딜:'N',계:'N',비:'N',비사:'-',주확:'2025.01.12',고:'Y',주담:'Y',폰:'Y',메:'N',회:'Y',담:'장한덕',접:'2025.01.31',니:true,주소:'서울 강남구 도산대로 318',빌:'장은빌딩',보:'48억 원',임:'1,420만 원/월',이유:'본사 확장 검토',ct:[{n:'심예린',t:'전략기획팀 대리',p:'010-****-8822',r:'주담당',lc:'2025.01.31'}],cl:[{d:'2025.01.31',by:'이민영',res:'ok',m:'GBD 잔류 / 확장 동시 검토'}],dl:[],my:true},
+  {id:30,n:'바디프랜드',g:'F',구:'법인사업자',규:'중견기업',종:'약 1,100명',사:'본사',지:'N',국:'국내',예:'-',예유:'N',예면:'-',현:'1,800',확만:'-',확임:'-',딜:'N',계:'N',비:'Y',비사:'폐업',주확:'2024.05.02',고:'N',주담:'N',폰:'N',메:'N',회:'N',담:'박환웅',접:'2024.05.02',니:false,주소:'서울 강남구 도곡로 222',빌:'바디프랜드 본사',보:'40억 원',임:'1,200만 원/월',이유:'-',ct:[],cl:[{d:'2024.05.02',by:'이민영',res:'ms',m:'법정관리 — 미관리 처리'}],dl:[],my:false}
 ];
 
 const GRADE_STYLES = {
@@ -3116,30 +3141,20 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(15);
 
-  // 필터 상태
-  const [filters, setFilters] = useState({
+  // 필터 상태 — 다중선택 가능한 키는 모두 배열
+  const INIT_FILTERS = {
     name: '', address: '',
-    bizType: [],     // 사업자 형태
-    classCat: [],    // 거래처 분류
-    grade: [],       // 거래처 등급
-    nation: 'all',   // 거래처 국가
-    site: 'all',     // 사업장 구분
-    branch: 'all',   // 지점보유 Y/N
-    contract: 'all', // 당사 계약 Y/N
-    expiryType: 'all', // 만기일 구분
+    bizType: [], classCat: [], grade: [],
+    nation: [], site: [], branch: [], contract: [], expiryType: [],
     expDateMin: '', expDateMax: '',
     cfDateMin: '', cfDateMax: '',
     expAreaMin: '', expAreaMax: '',
     cfAreaMin: '', cfAreaMax: '',
-    deal: 'all',     // 딜 진행
-    inactive: 'all', // 미관리 대상
-    inactiveReason: [],
-    manager: 'all',  // 담당자 유무
-    phone: 'all',    // 핸드폰 유무
-    email: 'all',    // 이메일 유무
-    tel: 'all',      // 회사번호 유무
-    salesManager: [],  // 세일즈 담당자
-  });
+    deal: [], inactive: [], inactiveReason: [],
+    manager: [], phone: [], email: [], tel: [],
+    salesManager: [],
+  };
+  const [filters, setFilters] = useState(INIT_FILTERS);
   const [openF, setOpenF] = useState(null);
 
   const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
@@ -3149,19 +3164,13 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
   const hasValue = (k) => {
     const v = filters[k];
     if (Array.isArray(v)) return v.length > 0;
-    return v && v !== 'all' && v !== '';
+    return v && v !== '';
   };
   const resetFilter = (k) => {
     if (Array.isArray(filters[k])) updateF(k, []);
-    else if (['nation','site','branch','contract','expiryType','deal','inactive','manager','phone','email','tel'].includes(k)) updateF(k, 'all');
     else updateF(k, '');
   };
-  const resetAll = () => setFilters({
-    name: '', address: '', bizType: [], classCat: [], grade: [], nation: 'all', site: 'all',
-    branch: 'all', contract: 'all', expiryType: 'all', expDateMin: '', expDateMax: '',
-    cfDateMin: '', cfDateMax: '', expAreaMin: '', expAreaMax: '', cfAreaMin: '', cfAreaMax: '',
-    deal: 'all', inactive: 'all', inactiveReason: [], manager: 'all', phone: 'all', email: 'all', tel: 'all', salesManager: [],
-  });
+  const resetAll = () => setFilters(INIT_FILTERS);
 
   // 외부 클릭으로 dropdown 닫기
   useEffect(() => {
@@ -3495,7 +3504,7 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
 /* ============================================================
  * CompanyDetailPage - 거래처 상세 페이지
  * ============================================================ */
-function CompanyDetailPage({ companyId, onBack }) {
+function CompanyDetailPage({ companyId, onBack, onOpenColdcall, onOpenDeal, onOpenContract }) {
   const c = COMPANIES.find(x => x.id === companyId);
   if (!c) return <div className="flex-1 flex items-center justify-center text-slate-400">거래처를 찾을 수 없습니다</div>;
 
@@ -3692,47 +3701,89 @@ function CompanyDetailPage({ companyId, onBack }) {
         </Section>
 
         {/* 연결된 콜드콜 (companyId 기준) */}
-        <Section title="연결된 콜드콜" tone="indigo" subtitle="이 거래처 콜드콜 작업 이력">
+        <Section title="연결된 콜드콜" tone="indigo" subtitle="이 거래처의 모든 콜드콜 작업 이력">
           {(() => {
-            const cc = COLDCALLS.find(x => x.companyId === c.id);
-            if (!cc) {
+            const ccs = COLDCALLS.filter(x => x.companyId === c.id);
+            if (ccs.length === 0) {
               return <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">연결된 콜드콜이 없습니다</div>;
             }
             return (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-                  <div className="flex items-center gap-3">
+              <div className="space-y-2">
+                {ccs.map(cc => (
+                  <div key={cc.id}
+                    onClick={() => onOpenColdcall && onOpenColdcall(cc.id)}
+                    className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white hover:bg-indigo-50/50 cursor-pointer transition">
                     <ColdcallStatusPill status={cc.st}/>
-                    <div className="text-[12px]"><b>{cc.mgr}</b> · 총 <b>{cc.cnt}회</b> · 최근 {cc.lc}</div>
-                    {cc.rc !== '-' && <span className="text-[11px] text-amber-700">재콜 예정 {cc.rc}</span>}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-semibold text-slate-800">{cc.mgr} · 총 {cc.cnt}회</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                        최근 {cc.lc}
+                        {cc.rc !== '-' && <span className="ml-2 text-amber-700">· 재콜 {cc.rc}</span>}
+                        {cc.led === 'Y' && <span className="ml-2 text-emerald-700 font-semibold">· 리드 전환</span>}
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-600 rounded">CC-{String(cc.id).padStart(3,'0')}</span>
+                    <ChevronRight size={14} className="text-indigo-500" />
                   </div>
-                  <button className="px-3 py-1 text-[11px] font-semibold border border-indigo-300 text-indigo-700 rounded hover:bg-indigo-100">통화 결과 입력</button>
-                </div>
-                <ColdcallDetailBody c={cc} hideHeader/>
+                ))}
               </div>
             );
           })()}
         </Section>
 
-        {/* 연결된 딜 & 계약 (Deals & Contracts) */}
-        <Section title="딜 & 계약" tone="emerald" subtitle="진행중/완료된 딜 및 계약 이력">
-          {c.dl.length === 0 ? (
-            <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">연결된 딜이 없습니다 — 딜 전환으로 생성 가능</div>
-          ) : (
-            <div className="space-y-2">
-              {c.dl.map((d, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white hover:bg-emerald-50/50 cursor-pointer">
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-700 rounded">{d.id}</span>
-                  <div className="flex-1">
-                    <div className="text-[13px] font-semibold">{d.nm}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">{d.mgr} · {d.area}</div>
+        {/* 연결된 딜 (DEALS 기준) */}
+        <Section title="연결된 딜" tone="amber" subtitle="진행중·완료 딜 이력">
+          {(() => {
+            const dls = DEALS.filter(x => x.companyId === c.id);
+            if (dls.length === 0) {
+              return <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">연결된 딜이 없습니다 — 딜 전환으로 생성 가능</div>;
+            }
+            return (
+              <div className="space-y-2">
+                {dls.map(d => (
+                  <div key={d.id}
+                    onClick={() => onOpenDeal && onOpenDeal(d.id)}
+                    className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white hover:bg-amber-50/50 cursor-pointer transition">
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-700 rounded font-mono">{d.did}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold truncate">{d.b1 || '빌딩 미정'}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">{d.mgr} · {d.area}평 · {d.region} · 만기 {d.expiry}</div>
+                    </div>
+                    <DealStatusPill status={d.st}/>
+                    <ChevronRight size={14} className="text-amber-600" />
                   </div>
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded">{d.st}</span>
-                  <ChevronRight size={14} className="text-emerald-600" />
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
+        </Section>
+
+        {/* 연결된 계약 (CONTRACTS 기준) */}
+        <Section title="연결된 계약" tone="emerald" subtitle="이 거래처와 체결된 계약 전체">
+          {(() => {
+            const cts = CONTRACTS.filter(x => x.companyId === c.id);
+            if (cts.length === 0) {
+              return <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">연결된 계약이 없습니다</div>;
+            }
+            return (
+              <div className="space-y-2">
+                {cts.map(ct => (
+                  <div key={ct.id}
+                    onClick={() => onOpenContract && onOpenContract(ct.id)}
+                    className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-white hover:bg-emerald-50/50 cursor-pointer transition">
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded font-mono">{ct.cid}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold truncate">{ct.bld}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">{ct.mgr} · {ct.area}평 · {ct.start} ~ {ct.end} · {ct.rent}</div>
+                    </div>
+                    <ContractTypePill type={ct.type}/>
+                    <ContractStatusPill status={ct.st}/>
+                    <ChevronRight size={14} className="text-emerald-600" />
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </Section>
       </div>
     </div>
@@ -3870,6 +3921,21 @@ const COLDCALLS = [
   {id:8,co:'쿠팡(주)',companyId:10,cg:'B',st:'부재',mgr:'이민영',lc:'2025.01.12',sc:'N',tip:'N',rc:'2025.02.10',cnt:1,led:'N',em:'2026.06.30',cm:'-',ef:'4,000',cf:'-',pd:'N',pdN:'-',pdT:'-',pdP:'-',calls:[{d:'2025.01.12',by:'이민영',res:'ms',m:'재콜 예정'}]},
   {id:9,co:'KT DS(주)',companyId:14,cg:'B',st:'니즈확인',mgr:'박지혜',lc:'2025.01.15',sc:'Y',tip:'Y',rc:'-',cnt:1,led:'N',em:'2025.10.31',cm:'-',ef:'1,100',cf:'-',pd:'Y',pdN:'조현민',pdT:'시설팀 대리',pdP:'010-****-2211',calls:[{d:'2025.01.15',by:'박지혜',res:'ok',m:'강남 이전 검토 중'}]},
   {id:10,co:'네이버클라우드(주)',companyId:8,cg:'B',st:'통화완료',mgr:'이민영',lc:'2025.01.25',sc:'Y',tip:'N',rc:'2025.02.25',cnt:1,led:'N',em:'2026.03.31',cm:'-',ef:'3,500',cf:'-',pd:'Y',pdN:'박현준',pdT:'시설팀장',pdP:'010-****-1122',calls:[{d:'2025.01.25',by:'이민영',res:'ok',m:'서울 강남 선호'}]},
+  {id:11,co:'이마트(주)',companyId:12,cg:'A',st:'리드전환',mgr:'박지혜',lc:'2025.01.28',sc:'Y',tip:'Y',rc:'-',cnt:4,led:'Y',em:'2025.06.30',cm:'2025.06.30',ef:'2,800',cf:'2,500',pd:'Y',pdN:'강민호',pdT:'시설관리팀장',pdP:'010-****-7788',calls:[{d:'2025.01.28',by:'박지혜',res:'ok',m:'도심권 이전 적극 검토 — 리드 전환'},{d:'2025.01.05',by:'박지혜',res:'ok',m:'6월 만기 확정'}]},
+  {id:12,co:'토스(비바리퍼블리카)',companyId:16,cg:'A',st:'니즈확인',mgr:'박지혜',lc:'2025.02.12',sc:'Y',tip:'Y',rc:'-',cnt:2,led:'N',em:'2025.05.31',cm:'2025.05.31',ef:'2,400',cf:'2,400',pd:'Y',pdN:'서민지',pdT:'People팀 매니저',pdP:'010-****-7711',calls:[{d:'2025.02.12',by:'박지혜',res:'ok',m:'GBD 확장 이전 검토'},{d:'2025.01.20',by:'박지혜',res:'ok',m:'5월 만기 확인'}]},
+  {id:13,co:'당근마켓',companyId:17,cg:'B',st:'재콜예정',mgr:'박지혜',lc:'2025.02.03',sc:'Y',tip:'N',rc:'2025.02.28',cnt:2,led:'N',em:'2025.09.30',cm:'-',ef:'1,400',cf:'-',pd:'Y',pdN:'한지윤',pdT:'운영팀 리더',pdP:'010-****-4422',calls:[{d:'2025.02.03',by:'박지혜',res:'ok',m:'강남권 1,500평 검토'},{d:'2025.01.10',by:'박지혜',res:'ms',m:'재콜 예정'}]},
+  {id:14,co:'딜리버리히어로코리아',companyId:19,cg:'A',st:'리드전환',mgr:'박지혜',lc:'2025.02.09',sc:'Y',tip:'Y',rc:'-',cnt:3,led:'Y',em:'2025.06.30',cm:'2025.06.30',ef:'1,600',cf:'1,600',pd:'Y',pdN:'박세린',pdT:'People Ops',pdP:'010-****-8855',calls:[{d:'2025.02.09',by:'박지혜',res:'ok',m:'서초/강남 1500평 검토'},{d:'2025.01.20',by:'박지혜',res:'ok',m:'만기 6월 확정'}]},
+  {id:15,co:'무신사',companyId:20,cg:'B',st:'통화완료',mgr:'박지혜',lc:'2025.01.28',sc:'Y',tip:'Y',rc:'2025.02.25',cnt:1,led:'N',em:'2025.11.30',cm:'-',ef:'2,000',cf:'-',pd:'Y',pdN:'조유나',pdT:'스페이스팀 리드',pdP:'010-****-9911',calls:[{d:'2025.01.28',by:'박지혜',res:'ok',m:'성수동 일대 추가 캠퍼스 검토'}]},
+  {id:16,co:'미래에셋자산운용',companyId:21,cg:'A',st:'니즈확인',mgr:'박지혜',lc:'2025.02.11',sc:'Y',tip:'Y',rc:'-',cnt:2,led:'N',em:'2025.08.31',cm:'2025.08.31',ef:'1,500',cf:'1,500',pd:'Y',pdN:'장영석',pdT:'총무팀 부장',pdP:'010-****-3399',calls:[{d:'2025.02.11',by:'박지혜',res:'ok',m:'CBD 내 이전 적극 검토'},{d:'2025.01.18',by:'박지혜',res:'ok',m:'8월 만기 확정'}]},
+  {id:17,co:'야놀자',companyId:23,cg:'B',st:'재콜예정',mgr:'박지혜',lc:'2025.01.22',sc:'Y',tip:'N',rc:'2025.02.22',cnt:2,led:'N',em:'2025.10.31',cm:'-',ef:'2,200',cf:'-',pd:'Y',pdN:'문서연',pdT:'시설팀 매니저',pdP:'010-****-6644',calls:[{d:'2025.01.22',by:'박지혜',res:'ok',m:'테헤란 일대 2000평 이상 검토'},{d:'2024.12.30',by:'이민영',res:'ms',m:'재콜 예정'}]},
+  {id:18,co:'직방',companyId:26,cg:'B',st:'리드전환',mgr:'박지혜',lc:'2025.02.13',sc:'Y',tip:'Y',rc:'-',cnt:3,led:'Y',em:'2025.07.31',cm:'2025.07.31',ef:'1,300',cf:'1,300',pd:'Y',pdN:'홍성민',pdT:'GA팀장',pdP:'010-****-2277',calls:[{d:'2025.02.13',by:'박지혜',res:'ok',m:'GBD 1300평 이전 확정 — 계약 진행'},{d:'2025.01.27',by:'박지혜',res:'ok',m:'7월 만기 확정'}]},
+  {id:19,co:'화이자코리아',companyId:28,cg:'A',st:'니즈확인',mgr:'박지혜',lc:'2025.02.14',sc:'Y',tip:'Y',rc:'-',cnt:2,led:'N',em:'2025.04.30',cm:'2025.04.30',ef:'1,800',cf:'1,800',pd:'Y',pdN:'케이트 박',pdT:'Facility Mgr',pdP:'010-****-5533',calls:[{d:'2025.02.14',by:'박지혜',res:'ok',m:'4월 만기, 여의도 잔류 우선'},{d:'2025.01.20',by:'박지혜',res:'ok',m:'IFC 재계약 vs 이전 검토'}]},
+  {id:20,co:'마켓컬리',companyId:29,cg:'C',st:'통화완료',mgr:'이민영',lc:'2025.01.31',sc:'Y',tip:'N',rc:'2025.03.05',cnt:1,led:'N',em:'2025.12.31',cm:'-',ef:'1,700',cf:'-',pd:'Y',pdN:'심예린',pdT:'전략기획팀 대리',pdP:'010-****-8822',calls:[{d:'2025.01.31',by:'이민영',res:'ok',m:'GBD 잔류 / 확장 동시 검토'}]},
+  {id:21,co:'아모레퍼시픽',companyId:18,cg:'C',st:'종료',mgr:'이민영',lc:'2024.12.18',sc:'Y',tip:'N',rc:'-',cnt:1,led:'N',em:'2026.04.30',cm:'-',ef:'3,800',cf:'-',pd:'Y',pdN:'배성훈',pdT:'GA담당 부장',pdP:'010-****-2266',calls:[{d:'2024.12.18',by:'이민영',res:'ok',m:'자가 사옥 — 장기 모니터링'}]},
+  {id:22,co:'대한항공',companyId:24,cg:'D',st:'번호오류',mgr:'이민영',lc:'2024.07.10',sc:'N',tip:'N',rc:'-',cnt:1,led:'N',em:'-',cm:'-',ef:'-',cf:'-',pd:'N',pdN:'-',pdT:'-',pdP:'-',calls:[{d:'2024.07.10',by:'이민영',res:'ms',m:'경쟁업체 전속 — 미관리 처리'}]},
+  {id:23,co:'한화생명',companyId:13,cg:'C',st:'종료',mgr:'이민영',lc:'2024.12.20',sc:'Y',tip:'N',rc:'-',cnt:1,led:'N',em:'2026.12.31',cm:'-',ef:'3,800',cf:'-',pd:'Y',pdN:'윤서영',pdT:'총무팀 차장',pdP:'010-****-9900',calls:[{d:'2024.12.20',by:'이민영',res:'ok',m:'현재 이전 없음, 장기 모니터링'}]},
+  {id:24,co:'CJ올리브네트웍스',companyId:11,cg:'D',st:'부재',mgr:'이민영',lc:'2024.12.10',sc:'N',tip:'N',rc:'2025.02.20',cnt:1,led:'N',em:'2026.09.30',cm:'-',ef:'1,500',cf:'-',pd:'Y',pdN:'유진아',pdT:'경영지원팀장',pdP:'010-****-5566',calls:[{d:'2024.12.10',by:'이민영',res:'ms',m:'재콜 필요'}]},
+  {id:25,co:'삼성SDS(주)',companyId:1,cg:'A',st:'리드전환',mgr:'박지혜',lc:'2025.02.10',sc:'Y',tip:'Y',rc:'-',cnt:2,led:'Y',em:'2025.03.31',cm:'2025.03.31',ef:'4,500',cf:'4,200',pd:'Y',pdN:'박지수',pdT:'경영지원 차장',pdP:'010-****-6789',calls:[{d:'2025.02.10',by:'박지혜',res:'ok',m:'실무 담당 추가 컨택 — 리드 보강'},{d:'2025.01.18',by:'박지혜',res:'ok',m:'실무 담당 정보 확보'}]},
 ];
 
 function ColdcallStatusPill({ status }) {
@@ -4081,7 +4147,7 @@ function ColdcallPage({ onlyMy, onOpenColdcall }) {
 }
 
 /* ColdcallDetailPage */
-function ColdcallDetailPage({ coldcallId, onBack }) {
+function ColdcallDetailPage({ coldcallId, onBack, onOpenCompany }) {
   const c = COLDCALLS.find(x => x.id === coldcallId);
   if (!c) return <div className="flex-1 flex items-center justify-center text-slate-400">콜드콜 정보를 찾을 수 없습니다</div>;
   return (
@@ -4093,7 +4159,12 @@ function ColdcallDetailPage({ coldcallId, onBack }) {
           </button>
           <div className="h-4 w-px bg-slate-200" />
           <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${GRADE_STYLES[c.cg]}`}>{c.cg}</span>
-          <h1 className="font-bold text-[16px] text-slate-900">{c.co}</h1>
+          <h1
+            onClick={() => onOpenCompany && c.companyId && onOpenCompany(c.companyId)}
+            className={`font-bold text-[16px] text-slate-900 ${onOpenCompany && c.companyId ? 'hover:text-indigo-600 cursor-pointer underline-offset-4 hover:underline' : ''}`}
+            title={onOpenCompany ? '거래처 상세로 이동' : undefined}>
+            {c.co}
+          </h1>
           <ColdcallStatusPill status={c.st}/>
         </div>
         <div className="flex items-center gap-2">
@@ -4216,6 +4287,13 @@ const DEALS = [
   {id:6,co:'우아한형제들(주)',companyId:7,cg:'C',did:'LD-2025-006',st:'검토중',mgr:'이수진',region:'GBD',area:'2,300',expiry:'2026.06.30',expiryType:'예상',b1:'성동구 성수동 H스퀘어',b2:'',ec:'2026.07.01',gen:'2025.02.05',cc_st:'재콜예정',cc_cnt:2,path:'공동중개',newType:'신규',currentRegion:'GBD',desiredRegion:'성수',moveLikelihood:'중',competitor:'N',progress:'제안서 발송',log:[{d:'2025.02.05',m:'2026년 이전 희망, 강남·성수 검토'}]},
   {id:7,co:'네이버클라우드(주)',companyId:8,cg:'B',did:'LD-2025-007',st:'협의중',mgr:'김민수',region:'GBD',area:'3,500',expiry:'2026.03.31',expiryType:'예상',b1:'강남구 테헤란로 I빌딩',b2:'서초구 J타워',ec:'2026.04.01',gen:'2025.02.01',cc_st:'통화완료',cc_cnt:1,path:'기존고객',newType:'기존',currentRegion:'판교',desiredRegion:'GBD',moveLikelihood:'상',competitor:'Y',progress:'미팅 진행',log:[{d:'2025.02.02',m:'서울 이전 확정, 강남권 협의 시작'}]},
   {id:8,co:'현대커머셜(주)',companyId:3,cg:'B',did:'LD-2025-008',st:'검토중',mgr:'박준호',region:'YBD',area:'1,800',expiry:'2026.01.31',expiryType:'예상',b1:'영등포구 여의도 K빌딩',b2:'',ec:'2026.02.15',gen:'2025.02.08',cc_st:'통화완료',cc_cnt:2,path:'LM마케팅',newType:'신규',currentRegion:'YBD',desiredRegion:'YBD',moveLikelihood:'중',competitor:'N',progress:'제안서 발송',log:[{d:'2025.02.08',m:'여의도 선호, 면적 1,500~2,000평'}]},
+  {id:9,co:'토스(비바리퍼블리카)',companyId:16,cg:'A',did:'LD-2025-009',st:'협의중',mgr:'이수진',region:'GBD',area:'2,400',expiry:'2025.05.31',expiryType:'확정',b1:'강남구 테헤란로 L타워',b2:'서초구 강남대로 M빌딩',ec:'2025.06.15',gen:'2025.02.01',cc_st:'니즈확인',cc_cnt:2,path:'기존고객',newType:'기존',currentRegion:'GBD',desiredRegion:'GBD',moveLikelihood:'확정',competitor:'N',progress:'미팅 진행',log:[{d:'2025.02.12',m:'L타워 우선 검토, 2차 미팅 일정'},{d:'2025.02.01',m:'딜 개시 — GBD 확장이전'}]},
+  {id:10,co:'딜리버리히어로코리아',companyId:19,cg:'A',did:'LD-2025-010',st:'제안완료',mgr:'주정호',region:'GBD',area:'1,600',expiry:'2025.06.30',expiryType:'확정',b1:'서초구 서초대로 N타워',b2:'강남구 역삼동 O빌딩',ec:'2025.07.01',gen:'2025.01.25',cc_st:'리드전환',cc_cnt:3,path:'개인발굴',newType:'신규',currentRegion:'GBD',desiredRegion:'GBD',moveLikelihood:'상',competitor:'N',progress:'LOI 제출',log:[{d:'2025.02.09',m:'1차 제안서 발송, 검토중'},{d:'2025.01.30',m:'현장 투어 2곳 완료'}]},
+  {id:11,co:'미래에셋자산운용',companyId:21,cg:'A',did:'LD-2025-011',st:'협의중',mgr:'송승원',region:'CBD',area:'1,500',expiry:'2025.08.31',expiryType:'확정',b1:'중구 을지로 P빌딩',b2:'',ec:'2025.09.10',gen:'2025.02.05',cc_st:'니즈확인',cc_cnt:2,path:'회사 인바운딩',newType:'기존',currentRegion:'CBD',desiredRegion:'CBD',moveLikelihood:'상',competitor:'N',progress:'미팅 진행',log:[{d:'2025.02.11',m:'CBD 내 잔류, P빌딩 검토'},{d:'2025.02.05',m:'딜 개시'}]},
+  {id:12,co:'직방',companyId:26,cg:'B',did:'LD-2025-012',st:'계약진행',mgr:'박인하',region:'GBD',area:'1,300',expiry:'2025.07.31',expiryType:'확정',b1:'서초구 강남대로 Q빌딩',b2:'',ec:'2025.08.01',gen:'2025.01.20',cc_st:'리드전환',cc_cnt:3,path:'기존고객',newType:'기존',currentRegion:'GBD',desiredRegion:'GBD',moveLikelihood:'확정',competitor:'N',progress:'계약서 검토 중',log:[{d:'2025.02.13',m:'계약서 검토 진행중, 서명 예정'},{d:'2025.02.02',m:'최종 조건 합의'}]},
+  {id:13,co:'화이자코리아',companyId:28,cg:'A',did:'LD-2025-013',st:'협의중',mgr:'임정수',region:'YBD',area:'1,800',expiry:'2025.04.30',expiryType:'확정',b1:'영등포구 국제금융로 IFC 3타워',b2:'',ec:'2025.05.01',gen:'2025.02.08',cc_st:'니즈확인',cc_cnt:2,path:'기존고객',newType:'기존',currentRegion:'YBD',desiredRegion:'YBD',moveLikelihood:'상',competitor:'N',progress:'미팅 진행',log:[{d:'2025.02.14',m:'IFC 재계약 협의, 4월 만기 임박'},{d:'2025.02.08',m:'딜 개시'}]},
+  {id:14,co:'무신사',companyId:20,cg:'B',did:'LD-2025-014',st:'검토중',mgr:'박환웅',region:'성수',area:'2,000',expiry:'2025.11.30',expiryType:'예상',b1:'성동구 성수동 R스퀘어',b2:'',ec:'2025.12.10',gen:'2025.02.10',cc_st:'통화완료',cc_cnt:1,path:'개인발굴',newType:'신규',currentRegion:'성수',desiredRegion:'성수',moveLikelihood:'중',competitor:'N',progress:'제안서 발송',log:[{d:'2025.02.10',m:'성수 캠퍼스 확장 — 인접 빌딩 검토'}]},
+  {id:15,co:'당근마켓',companyId:17,cg:'B',did:'LD-2025-015',st:'무산',mgr:'김민희',region:'GBD',area:'1,400',expiry:'2025.09.30',expiryType:'예상',b1:'서초구 강남대로 S빌딩',b2:'',ec:'2025.10.10',gen:'2025.01.15',cc_st:'재콜예정',cc_cnt:2,path:'LM마케팅',newType:'신규',currentRegion:'GBD',desiredRegion:'GBD',moveLikelihood:'하',competitor:'Y',progress:'미계약',log:[{d:'2025.02.05',m:'경쟁사 측 조건 우위 — 무산 처리'},{d:'2025.01.15',m:'1차 제안서 발송'}]},
 ];
 
 function DealStatusPill({ status }) {
@@ -4479,7 +4557,7 @@ function DealsPage({ onlyMy, onOpenDeal }) {
   );
 }
 
-function DealDetailPage({ dealId, onBack }) {
+function DealDetailPage({ dealId, onBack, onOpenCompany }) {
   const d = DEALS.find(x => x.id === dealId);
   if (!d) return <div className="flex-1 flex items-center justify-center text-slate-400">딜 정보를 찾을 수 없습니다</div>;
   const stepIdx = DEAL_STEPS.indexOf(d.st);
@@ -4493,7 +4571,12 @@ function DealDetailPage({ dealId, onBack }) {
           <div className="h-4 w-px bg-slate-200" />
           <span className="text-[10px] text-slate-500 font-mono">{d.did}</span>
           <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${GRADE_STYLES[d.cg]}`}>{d.cg}</span>
-          <h1 className="font-bold text-[16px] text-slate-900">{d.co}</h1>
+          <h1
+            onClick={() => onOpenCompany && d.companyId && onOpenCompany(d.companyId)}
+            className={`font-bold text-[16px] text-slate-900 ${onOpenCompany && d.companyId ? 'hover:text-indigo-600 cursor-pointer underline-offset-4 hover:underline' : ''}`}
+            title={onOpenCompany ? '거래처 상세로 이동' : undefined}>
+            {d.co}
+          </h1>
           <DealStatusPill status={d.st}/>
         </div>
         <div className="flex items-center gap-2">
@@ -4502,13 +4585,13 @@ function DealDetailPage({ dealId, onBack }) {
         </div>
       </div>
       <div className="p-5">
-        <DealDetailBody d={d} stepIdx={stepIdx} />
+        <DealDetailBody d={d} stepIdx={stepIdx} onOpenCompany={onOpenCompany} />
       </div>
     </div>
   );
 }
 
-function DealDetailBody({ d, stepIdx, hideHeader }) {
+function DealDetailBody({ d, stepIdx, hideHeader, onOpenCompany }) {
   const [memoInput, setMemoInput] = useState('');
   const [addedMemos, setAddedMemos] = useState([]);
   const addMemo = () => {
@@ -4564,7 +4647,13 @@ function DealDetailBody({ d, stepIdx, hideHeader }) {
 
       <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-sky-50 text-sky-900">🏢 거래처 연결 정보</div>
       <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
-        <KV k="거래처명" v={d.co}/>
+        <KV k="거래처명" v={
+          <span
+            onClick={() => onOpenCompany && d.companyId && onOpenCompany(d.companyId)}
+            className={onOpenCompany && d.companyId ? 'text-indigo-600 hover:text-indigo-800 cursor-pointer underline-offset-2 hover:underline' : ''}>
+            {d.co}{onOpenCompany && d.companyId && <span className="ml-1 text-[10px] text-indigo-400">↗</span>}
+          </span>
+        }/>
         <KV k="거래처 등급" v={<span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[d.cg]}`}>{d.cg}</span>}/>
         <KV k="만기일" v={`${d.expiry} (${d.expiryType})`} tone={d.expiryType === '확정' ? 'g' : 'w'}/>
         <KV k="콜드콜 상태" v={`${d.cc_st} · ${d.cc_cnt}회`}/>
@@ -4641,6 +4730,12 @@ const CONTRACTS = [
   {id:4,co:'신한은행',companyId:9,cg:'A',cid:'CT-2024-018',did:'-',st:'갱신 협의',mgr:'박준호',region:'CBD',area:'4,800',bld:'신한은행 본점',floor:'2~8층',start:'2026.01.01',end:'2031.12.31',deposit:'200억 원',rent:'6,100만 원/월',mgmt:'720만 원/월',type:'갱신',gen:'2024.11.01',rentNum:6100,log:[{d:'2025.01.20',m:'갱신 조건 협의 진행중'},{d:'2024.12.15',m:'갱신 의사 확인, 협의 시작'}]},
   {id:5,co:'한화생명',companyId:13,cg:'C',cid:'CT-2023-007',did:'-',st:'입주 완료',mgr:'이수진',region:'YBD',area:'3,600',bld:'한화생명 63빌딩',floor:'15~22층',start:'2024.01.01',end:'2029.12.31',deposit:'130억 원',rent:'4,200만 원/월',mgmt:'500만 원/월',type:'갱신',gen:'2023.11.15',rentNum:4200,log:[{d:'2024.01.02',m:'입주 완료, 정상 운영'},{d:'2023.12.28',m:'이사 완료 확인'}]},
   {id:6,co:'KT DS(주)',companyId:14,cg:'B',cid:'CT-2025-004',did:'LD-2025-007',st:'계약 완료',mgr:'김민수',region:'GBD',area:'1,100',bld:'강남구 테헤란로 I빌딩',floor:'3~4층',start:'2026.01.01',end:'2029.12.31',deposit:'33억 원',rent:'960만 원/월',mgmt:'110만 원/월',type:'신규',gen:'2025.02.18',rentNum:960,log:[{d:'2025.02.18',m:'계약서 서명 완료'},{d:'2025.02.14',m:'최종 조건 합의'}]},
+  {id:7,co:'직방',companyId:26,cg:'B',cid:'CT-2025-005',did:'LD-2025-012',st:'입주 예정',mgr:'박인하',region:'GBD',area:'1,300',bld:'서초구 강남대로 교보타워',floor:'18~19층',start:'2025.08.01',end:'2028.07.31',deposit:'45억 원',rent:'1,350만 원/월',mgmt:'160만 원/월',type:'확장 이전',gen:'2025.02.14',rentNum:1350,log:[{d:'2025.02.14',m:'계약 체결, 인테리어 일정 협의'},{d:'2025.02.10',m:'최종 조건 합의'}]},
+  {id:8,co:'아모레퍼시픽',companyId:18,cg:'C',cid:'CT-2022-011',did:'-',st:'입주 완료',mgr:'정혜정',region:'기타',area:'3,600',bld:'아모레퍼시픽 본사',floor:'12~17층',start:'2023.01.01',end:'2027.12.31',deposit:'140억 원',rent:'4,500만 원/월',mgmt:'520만 원/월',type:'갱신',gen:'2022.10.15',rentNum:4500,log:[{d:'2023.01.05',m:'정상 운영 중'},{d:'2022.12.20',m:'갱신 계약 서명 완료'}]},
+  {id:9,co:'토스(비바리퍼블리카)',companyId:16,cg:'A',cid:'CT-2025-006',did:'LD-2025-009',st:'입주 예정',mgr:'이수진',region:'GBD',area:'2,400',bld:'강남구 테헤란로 L타워',floor:'10~13층',start:'2025.07.01',end:'2030.06.30',deposit:'72억 원',rent:'2,160만 원/월',mgmt:'250만 원/월',type:'확장 이전',gen:'2025.02.20',rentNum:2160,log:[{d:'2025.02.20',m:'계약 체결 완료'},{d:'2025.02.15',m:'면적 2,400평 최종 확정'}]},
+  {id:10,co:'미래에셋자산운용',companyId:21,cg:'A',cid:'CT-2025-007',did:'LD-2025-011',st:'계약 완료',mgr:'송승원',region:'CBD',area:'1,500',bld:'중구 을지로 P빌딩',floor:'21~22층',start:'2025.09.01',end:'2030.08.31',deposit:'68억 원',rent:'1,950만 원/월',mgmt:'220만 원/월',type:'동일 면적 이전',gen:'2025.02.16',rentNum:1950,log:[{d:'2025.02.16',m:'계약서 서명 완료'},{d:'2025.02.11',m:'조건 협의 완료'}]},
+  {id:11,co:'화이자코리아',companyId:28,cg:'A',cid:'CT-2020-005',did:'-',st:'갱신 협의',mgr:'임정수',region:'YBD',area:'1,650',bld:'IFC서울 3타워',floor:'24층',start:'2025.05.01',end:'2030.04.30',deposit:'72억 원',rent:'2,250만 원/월',mgmt:'260만 원/월',type:'재계약',gen:'2020.04.10',rentNum:2250,log:[{d:'2025.02.14',m:'갱신 조건 협의 진행중'},{d:'2025.01.20',m:'재계약 의사 확인'}]},
+  {id:12,co:'딜리버리히어로코리아',companyId:19,cg:'A',cid:'CT-2025-008',did:'LD-2025-010',st:'입주 예정',mgr:'주정호',region:'GBD',area:'1,600',bld:'서초구 서초대로 N타워',floor:'7~8층',start:'2025.07.01',end:'2028.06.30',deposit:'52억 원',rent:'1,580만 원/월',mgmt:'190만 원/월',type:'확장 이전',gen:'2025.02.13',rentNum:1580,log:[{d:'2025.02.13',m:'계약 체결, 인테리어 준비'},{d:'2025.02.08',m:'최종 조건 합의'}]},
 ];
 
 function ContractStatusPill({ status }) {
@@ -4879,7 +4974,7 @@ function ContractsPage({ onlyMy, onOpenContract }) {
   );
 }
 
-function ContractDetailPage({ contractId, onBack }) {
+function ContractDetailPage({ contractId, onBack, onOpenCompany }) {
   const c = CONTRACTS.find(x => x.id === contractId);
   if (!c) return <div className="flex-1 flex items-center justify-center text-slate-400">계약 정보를 찾을 수 없습니다</div>;
   const [memoInput, setMemoInput] = useState('');
@@ -4908,7 +5003,12 @@ function ContractDetailPage({ contractId, onBack }) {
           <div className="h-4 w-px bg-slate-200" />
           <span className="text-[10px] text-slate-500 font-mono">{c.cid}</span>
           <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${GRADE_STYLES[c.cg]}`}>{c.cg}</span>
-          <h1 className="font-bold text-[16px] text-slate-900">{c.co}</h1>
+          <h1
+            onClick={() => onOpenCompany && c.companyId && onOpenCompany(c.companyId)}
+            className={`font-bold text-[16px] text-slate-900 ${onOpenCompany && c.companyId ? 'hover:text-indigo-600 cursor-pointer underline-offset-4 hover:underline' : ''}`}
+            title={onOpenCompany ? '거래처 상세로 이동' : undefined}>
+            {c.co}
+          </h1>
           <ContractStatusPill status={c.st}/>
           <ContractTypePill type={c.type}/>
         </div>
@@ -4952,7 +5052,13 @@ function ContractDetailPage({ contractId, onBack }) {
 
         <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-sky-50 text-sky-900">🔗 연결 정보</div>
         <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
-          <KV k="거래처명" v={c.co}/>
+          <KV k="거래처명" v={
+            <span
+              onClick={() => onOpenCompany && c.companyId && onOpenCompany(c.companyId)}
+              className={onOpenCompany && c.companyId ? 'text-indigo-600 hover:text-indigo-800 cursor-pointer underline-offset-2 hover:underline' : ''}>
+              {c.co}{onOpenCompany && c.companyId && <span className="ml-1 text-[10px] text-indigo-400">↗</span>}
+            </span>
+          }/>
           <KV k="거래처 등급" v={<span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.cg]}`}>{c.cg}</span>}/>
           <KV k="딜 ID" v={c.did !== '-' ? c.did : '직접 갱신'}/>
           <KV k="생성일" v={c.gen}/>
