@@ -59,6 +59,7 @@ const ShoppingBag   = (p) => <Svg {...p}><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2
 const X             = (p) => <Svg {...p}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Svg>;
 const Trash2        = (p) => <Svg {...p}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></Svg>;
 const AlertCircle   = (p) => <Svg {...p}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></Svg>;
+const Settings      = (p) => <Svg {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></Svg>;
 
 /* ===== 권역별 색상 (요구사항 6) ===== */
 const REGION_COLORS = {
@@ -726,26 +727,23 @@ const BUILDINGS = [
 
 /* ===== 사이드바 메뉴 (개편) ===== */
 const NAV_SECTIONS = [
-  { group: '메인', items: [
+  { items: [
     { icon: Home, label: '홈 대시보드' }
   ]},
-  { group: '빌딩', items: [
-    { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'], active: true, activeChild: '지도' }
+  { divider: true, items: [
+    { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'], active: true, activeChild: '지도' },
+    { icon: Briefcase, label: '거래처', children: ['전체 거래처', 'My 거래처'] },
   ]},
-  { group: '거래처', items: [
-    { icon: Briefcase, label: '거래처', children: ['전체 거래처', 'My 거래처'] }
+  { divider: true, items: [
+    { icon: Sparkles, label: '영업', children: ['전체 딜', 'My 딜'] },
+    { icon: FileText, label: '계약', children: ['전체 계약', 'My 계약'] },
   ]},
-  { group: '담당자 관리', items: [
-    { icon: Users, label: '담당자', children: ['전체 담당자'] }
+  { divider: true, items: [
+    { icon: UserCheck, label: '콜드콜', children: ['전체 콜드콜', 'My 콜드콜'] },
+    { icon: Users, label: '임차 담당자', children: ['전체 임차 담당자'] },
   ]},
-  { group: '콜드콜', items: [
-    { icon: UserCheck, label: '콜드콜', children: ['전체 콜드콜', 'My 콜드콜'] }
-  ]},
-  { group: '영업 관리', items: [
-    { icon: Sparkles, label: '영업', children: ['전체 딜', 'My 딜'] }
-  ]},
-  { group: '계약 관리', items: [
-    { icon: FileText, label: '계약', children: ['전체 계약', 'My 계약'] }
+  { divider: true, admin: true, items: [
+    { icon: Settings, label: '설정', children: ['사용자 / 권한 관리', '보안 정책', '시스템 로그'] },
   ]},
 ];
 
@@ -818,12 +816,13 @@ function GenstarMate() {
   const [cartOpen, setCartOpen]           = useState(false);
   const [detailOpen, setDetailOpen]       = useState(true);
   const [compareOpen, setCompareOpen]     = useState(false);
-  const [pageView, setPageView]           = useState('map'); // 'map' | 'detail' | 'allBuildings' | 'companiesAll' | 'companiesMy' | 'companyDetail' | ...
-  const [previousView, setPreviousView]   = useState('map'); // 뒤로가기에서 돌아갈 페이지
+  const [pageView, setPageView]           = useState('home'); // 'home' | 'map' | 'detail' | ...
+  const [previousView, setPreviousView]   = useState('home'); // 뒤로가기에서 돌아갈 페이지
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
   const [selectedColdcallId, setSelectedColdcallId] = useState(null);
   const [selectedDealId, setSelectedDealId] = useState(null);
   const [selectedContractId, setSelectedContractId] = useState(null);
+  const [selectedContactId, setSelectedContactId] = useState(null);
   const [visitedIds, setVisitedIds]       = useState(new Set());
   const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
 
@@ -1031,10 +1030,18 @@ function GenstarMate() {
             onOpenContract={(id) => { setSelectedContractId(id); setPreviousView(pageView); setPageView('contractDetail'); }}/>
         ) : pageView === 'contractDetail' ? (
           <ContractDetailPage contractId={selectedContractId} onBack={() => setPageView(previousView)} />
+        ) : pageView === 'home' ? (
+          <HomeDashboard onNavigate={setPageView}/>
+        ) : pageView === 'contactsAll' ? (
+          <ContactsPage
+            onOpenContact={(id) => { setSelectedContactId(id); setPreviousView('contactsAll'); setPageView('contactDetail'); }}
+            onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('contactsAll'); setPageView('companyDetail'); }}/>
+        ) : pageView === 'contactDetail' ? (
+          <ContactDetailPage contactId={selectedContactId}
+            onBack={() => setPageView(previousView)}
+            onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('contactDetail'); setPageView('companyDetail'); }}/>
         ) : (
-          <WipPage label={({
-            contactsAll: '담당자 관리',
-          })[pageView] || '준비중'} />
+          <WipPage label="준비중" />
         )}
       </div>
 
@@ -1059,25 +1066,31 @@ function GenstarMate() {
 function Sidebar({ open, onToggle, currentPage, onNavigate }) {
   // child label → pageView 매핑
   const CHILD_TO_PAGE = {
+    '홈 대시보드': 'home',
     '지도': 'map',
     '전체 빌딩': 'allBuildings',
     '전체 거래처': 'companiesAll',
     'My 거래처': 'companiesMy',
-    '전체 담당자': 'contactsAll',
+    '전체 임차 담당자': 'contactsAll',
     '전체 콜드콜': 'coldcallAll',
     'My 콜드콜': 'coldcallMy',
     '전체 딜': 'dealsAll',
     'My 딜': 'dealsMy',
     '전체 계약': 'contractsAll',
     'My 계약': 'contractsMy',
+    '사용자 / 권한 관리': 'settingsUsers',
+    '보안 정책': 'settingsSecurity',
+    '시스템 로그': 'settingsLogs',
   };
   const PAGE_TO_CHILD = {
+    'home': '홈 대시보드',
     'map': '지도', 'detail': '지도', 'allBuildings': '전체 빌딩',
     'companiesAll': '전체 거래처', 'companiesMy': 'My 거래처', 'companyDetail': '전체 거래처',
-    'contactsAll': '전체 담당자',
+    'contactsAll': '전체 임차 담당자', 'contactDetail': '전체 임차 담당자',
     'coldcallAll': '전체 콜드콜', 'coldcallMy': 'My 콜드콜', 'coldcallDetail': '전체 콜드콜',
     'dealsAll': '전체 딜', 'dealsMy': 'My 딜', 'dealDetail': '전체 딜',
     'contractsAll': '전체 계약', 'contractsMy': 'My 계약', 'contractDetail': '전체 계약',
+    'settingsUsers': '사용자 / 권한 관리', 'settingsSecurity': '보안 정책', 'settingsLogs': '시스템 로그',
   };
   const activeChild = PAGE_TO_CHILD[currentPage] || '지도';
 
@@ -1107,21 +1120,26 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
         </button>
       </div>
       <nav className="flex-1 overflow-y-auto py-2">
-        {NAV_SECTIONS.map(section => (
-          <div key={section.group} className="mb-3">
-            {open && <div className="px-3 text-[9px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{section.group}</div>}
+        {NAV_SECTIONS.map((section, sIdx) => (
+          <React.Fragment key={sIdx}>
+            {section.divider && open && <div className="border-t border-slate-700/30 my-2 mx-3"/>}
+            {section.divider && !open && <div className="border-t border-slate-700/30 my-2 mx-2"/>}
             {section.items.map(item => {
               const Icon = item.icon;
               const hasChildren = !!item.children;
               const isExpanded = hasChildren ? !!expanded[item.label] : false;
+              const isAdmin = section.admin;
               return (
                 <div key={item.label}>
                   <div onClick={() => hasChildren && toggle(item.label)}
-                    className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer transition select-none ${item.active ? 'text-white bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/30'}`}>
+                    className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer transition select-none ${
+                      isAdmin ? 'text-rose-300 hover:bg-rose-900/20' :
+                      item.active ? 'text-white bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/30'
+                    }`}>
                     <Icon size={13} strokeWidth={1.75} />
                     {open && <span className="font-medium flex-1">{item.label}</span>}
                     {open && hasChildren && (
-                      <ChevronDown size={11} className="text-slate-400 transition-transform duration-200"
+                      <ChevronDown size={11} className={`transition-transform duration-200 ${isAdmin ? 'text-rose-300/60' : 'text-slate-400'}`}
                         style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }} />
                     )}
                   </div>
@@ -1133,7 +1151,11 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
                         return (
                           <div key={child}
                             onClick={() => pageKey && onNavigate && onNavigate(pageKey)}
-                            className={`px-3 py-1 text-[11px] cursor-pointer transition ${isActive ? 'text-indigo-300 font-semibold border-l-2 border-indigo-400 pl-2.5' : 'text-slate-400 hover:text-slate-200'}`}>
+                            className={`px-3 py-1 text-[11px] cursor-pointer transition ${
+                              isActive ? 'text-indigo-300 font-semibold border-l-2 border-indigo-400 pl-2.5' :
+                              isAdmin ? 'text-rose-300/70 hover:text-rose-200' :
+                              'text-slate-400 hover:text-slate-200'
+                            }`}>
                             {child}
                           </div>
                         );
@@ -1143,18 +1165,9 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
                 </div>
               );
             })}
-          </div>
+          </React.Fragment>
         ))}
       </nav>
-      {open && (
-        <div className="px-3 py-2 border-t border-slate-700/40 flex items-center gap-2 flex-shrink-0">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[10px] font-bold flex-shrink-0">LM</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold truncate">장한덕 본부장</div>
-            <div className="text-[9px] text-slate-400 truncate">LM본부 · 관리자</div>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
@@ -3590,7 +3603,7 @@ function CompanyDetailPage({ companyId, onBack }) {
         </Section>
 
         {/* 담당자 컨택포인트 */}
-        <Section title="고객 (담당자 컨택포인트)" tone="slate">
+        <Section title="임차 담당자" tone="slate">
           {c.ct.length === 0 ? (
             <div className="text-center text-[11px] text-slate-400 py-6 border border-dashed border-slate-200 rounded">등록된 담당자가 없습니다</div>
           ) : (
@@ -4896,6 +4909,577 @@ function ContractDetailPage({ contractId, onBack }) {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * 임차 담당자(Contact) 데이터 & 컴포넌트
+ * ============================================================ */
+const CONTACT_ROLE_STYLES = {
+  '주담당': ['#534AB7', '#fff'],
+  '실무':   ['#0F6E56', '#fff'],
+  '보조':   ['#888',   '#fff'],
+};
+const CONTACTS = [
+  {id:1, name:'이재용', title:'총무팀 부장',     co:'삼성SDS(주)',         companyId:1,  coGrade:'A', role:'주담당', phone:'010-****-5678', email:'lee@samsungsds.com', lastContact:'2025.02.10', hasPhone:true, hasEmail:true, ourMgr:'김민수', log:[{d:'2025.02.10',m:'이전 검토 중, 3월 미팅 예약'},{d:'2025.01.22',m:'재콜 2/10'}]},
+  {id:2, name:'박지수', title:'경영지원 차장',   co:'삼성SDS(주)',         companyId:1,  coGrade:'A', role:'실무',  phone:'010-****-6789', email:'park@samsungsds.com', lastContact:'2025.01.28', hasPhone:true, hasEmail:true, ourMgr:'김민수', log:[{d:'2025.01.28',m:'내부 검토 일정 공유'}]},
+  {id:3, name:'장태영', title:'시설관리팀장',     co:'카카오엔터프라이즈', companyId:2,  coGrade:'A', role:'주담당', phone:'010-****-3456', email:'jang@kakao.com', lastContact:'2025.01.30', hasPhone:true, hasEmail:true, ourMgr:'이수진', log:[{d:'2025.01.30',m:'강남권 이전 의사 확인'}]},
+  {id:4, name:'최한솔', title:'경영지원팀 과장', co:'현대커머셜(주)',     companyId:3,  coGrade:'B', role:'주담당', phone:'010-****-7890', email:'choi@hyundai.com', lastContact:'2025.02.05', hasPhone:true, hasEmail:false, ourMgr:'박준호', log:[{d:'2025.02.05',m:'여의도 또는 강남 선호'}]},
+  {id:5, name:'홍길현', title:'총무팀 차장',     co:'LG CNS(주)',         companyId:4,  coGrade:'D', role:'주담당', phone:null, email:'hong@lgcns.com', lastContact:'2024.11.15', hasPhone:false, hasEmail:true, ourMgr:'최지원', log:[{d:'2024.11.15',m:'재콜 예정'}]},
+  {id:6, name:'김도현', title:'경영지원 대리',   co:'롯데액셀러레이터',   companyId:5,  coGrade:'A', role:'주담당', phone:'010-****-8901', email:'kim@lotte.com', lastContact:'2025.02.08', hasPhone:true, hasEmail:true, ourMgr:'한소연', log:[{d:'2025.02.08',m:'강남권 500~1000평 검토 중'},{d:'2025.01.25',m:'4월 만기, 이전 의사 확인'}]},
+  {id:7, name:'오세연', title:'총무팀 사원',     co:'SK바이오팜(주)',     companyId:6,  coGrade:'E', role:'주담당', phone:null, email:null, lastContact:'2024.09.10', hasPhone:false, hasEmail:false, ourMgr:'정대한', log:[{d:'2024.09.10',m:'이전 계획 없음 확인'}]},
+  {id:8, name:'신민아', title:'시설팀장',         co:'우아한형제들(주)',   companyId:7,  coGrade:'C', role:'주담당', phone:'010-****-5671', email:'shin@woowahan.com', lastContact:'2025.02.01', hasPhone:true, hasEmail:true, ourMgr:'이수진', log:[{d:'2025.02.01',m:'강남 또는 성수 선호, 2026 확정'}]},
+  {id:9, name:'이준혁', title:'경영지원 대리',   co:'우아한형제들(주)',   companyId:7,  coGrade:'C', role:'실무',  phone:'010-****-9012', email:'lee@woowahan.com', lastContact:'2025.01.18', hasPhone:true, hasEmail:true, ourMgr:'이수진', log:[{d:'2025.01.18',m:'내부 검토 일정 공유'}]},
+  {id:10,name:'박현준', title:'시설팀장',         co:'네이버클라우드(주)', companyId:8,  coGrade:'B', role:'주담당', phone:'010-****-1122', email:'park@naver.com', lastContact:'2025.01.25', hasPhone:true, hasEmail:true, ourMgr:'김민수', log:[{d:'2025.01.25',m:'서울 강남 선호 확인'}]},
+  {id:11,name:'이정민', title:'총무부장',         co:'신한은행',           companyId:9,  coGrade:'A', role:'주담당', phone:'010-****-3344', email:'lee@shinhan.com', lastContact:'2025.01.20', hasPhone:true, hasEmail:true, ourMgr:'박준호', log:[{d:'2025.01.20',m:'CBD 내 이전 검토 진행중'}]},
+  {id:12,name:'김성훈', title:'시설팀 과장',     co:'쿠팡(주)',           companyId:10, coGrade:'B', role:'주담당', phone:null, email:'kim@coupang.com', lastContact:'2025.01.12', hasPhone:false, hasEmail:true, ourMgr:'최지원', log:[{d:'2025.01.12',m:'재콜 예정'}]},
+  {id:13,name:'강민호', title:'시설관리팀장',     co:'이마트(주)',         companyId:12, coGrade:'A', role:'주담당', phone:'010-****-7788', email:'kang@emart.com', lastContact:'2025.01.28', hasPhone:true, hasEmail:true, ourMgr:'정대한', log:[{d:'2025.01.28',m:'도심권 이전 적극 검토'}]},
+  {id:14,name:'윤서영', title:'총무팀 차장',     co:'한화생명',           companyId:13, coGrade:'C', role:'주담당', phone:'010-****-9900', email:'yoon@hanwhalife.com', lastContact:'2024.12.20', hasPhone:true, hasEmail:true, ourMgr:'이수진', log:[{d:'2024.12.20',m:'현재 이전 없음, 장기 모니터링'}]},
+  {id:15,name:'조현민', title:'시설팀 대리',     co:'KT DS(주)',          companyId:14, coGrade:'B', role:'주담당', phone:'010-****-2211', email:'cho@ktds.com', lastContact:'2025.01.15', hasPhone:true, hasEmail:true, ourMgr:'김민수', log:[{d:'2025.01.15',m:'강남 이전 검토 중'}]},
+  {id:16,name:'유진아', title:'경영지원팀장',     co:'CJ올리브네트웍스',   companyId:11, coGrade:'D', role:'주담당', phone:'010-****-5566', email:'yoo@cj.net', lastContact:'2024.12.10', hasPhone:true, hasEmail:true, ourMgr:'한소연', log:[{d:'2024.12.10',m:'현재 이전 계획 없음'}]},
+];
+
+function ContactRolePill({ role }) {
+  const [bg, c] = CONTACT_ROLE_STYLES[role] || ['#888','#fff'];
+  return <span style={{display:'inline-block',padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:500,background:bg,color:c}}>{role}</span>;
+}
+function contactInitials(name) {
+  return name ? name.slice(0,2) : '';
+}
+
+function ContactsPage({ onOpenContact, onOpenCompany }) {
+  const [sort, setSort] = useState('recent');
+  const [perPage, setPerPage] = useState(15);
+  const [page, setPage] = useState(1);
+  const [openF, setOpenF] = useState(null);
+  const [filters, setFilters] = useState({
+    name:'', company:'', grade:[], role:'all', ourMgr:[], title:'',
+    lastContact:['',''], phone:'all', email:'all',
+  });
+  const updateF = (k, v) => setFilters(p => ({ ...p, [k]: v }));
+  const toggleArr = (k, v) => setFilters(p => ({ ...p, [k]: p[k].includes(v) ? p[k].filter(x => x !== v) : [...p[k], v] }));
+  const hasV = (k) => {
+    const v = filters[k];
+    if (Array.isArray(v)) {
+      if (v.length === 2 && typeof v[0] === 'string' && (v[0] !== '' || v[1] !== '')) return true;
+      return v.length > 0 && typeof v[0] !== 'string';
+    }
+    return v && v !== 'all' && v !== '';
+  };
+  const resetAll = () => setFilters({
+    name:'', company:'', grade:[], role:'all', ourMgr:[], title:'',
+    lastContact:['',''], phone:'all', email:'all',
+  });
+  useEffect(() => {
+    const h = (e) => { if (!e.target.closest('.f-btn-wrap')) setOpenF(null); };
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, []);
+
+  const filtered = useMemo(() => {
+    let arr = CONTACTS.filter(c => {
+      if (filters.name && !c.name.toLowerCase().includes(filters.name.toLowerCase())) return false;
+      if (filters.company && !c.co.toLowerCase().includes(filters.company.toLowerCase())) return false;
+      if (filters.grade.length > 0 && !filters.grade.includes(c.coGrade)) return false;
+      if (filters.role !== 'all' && c.role !== filters.role) return false;
+      if (filters.ourMgr.length > 0 && !filters.ourMgr.includes(c.ourMgr)) return false;
+      if (filters.title && !c.title.toLowerCase().includes(filters.title.toLowerCase())) return false;
+      if (filters.phone === 'Y' && !c.hasPhone) return false;
+      if (filters.phone === 'N' && c.hasPhone) return false;
+      if (filters.email === 'Y' && !c.hasEmail) return false;
+      if (filters.email === 'N' && c.hasEmail) return false;
+      const lc = c.lastContact.replace(/\./g, '-');
+      if (filters.lastContact[0] && lc < filters.lastContact[0]) return false;
+      if (filters.lastContact[1] && lc > filters.lastContact[1]) return false;
+      return true;
+    });
+    arr.sort((a, b) => {
+      switch (sort) {
+        case 'name': return a.name.localeCompare(b.name, 'ko');
+        case 'grade': return a.coGrade.localeCompare(b.coGrade);
+        case 'company': return a.co.localeCompare(b.co, 'ko');
+        case 'recent':
+        default: return b.lastContact.localeCompare(a.lastContact);
+      }
+    });
+    return arr;
+  }, [sort, filters]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const paged = filtered.slice((page-1)*perPage, page*perPage);
+  useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center text-sky-700">👤</div>
+          <h1 className="font-bold text-[15px] text-slate-900">전체 임차 담당자</h1>
+          <span className="text-[11px] text-slate-400">거래처 컨택 담당자 관리</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={resetAll} className="px-2.5 py-1.5 text-[11px] text-slate-600 hover:text-indigo-600">↺ 초기화</button>
+          <button className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">+ 임차 담당자 등록</button>
+        </div>
+      </div>
+
+      <div className="bg-white px-4 py-2 flex items-center gap-1.5 flex-wrap flex-shrink-0 border-b border-slate-100">
+        <span className="text-[11px] text-slate-500 font-semibold mr-1">필터</span>
+        <FilterBtn label="🔍 이름" k="ct2-nm" openF={openF} setOpenF={setOpenF} hasValue={hasV('name')}>
+          <input type="text" value={filters.name} onChange={e => updateF('name', e.target.value)}
+            placeholder="담당자 이름 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="소속 거래처" k="ct2-co" openF={openF} setOpenF={setOpenF} hasValue={hasV('company')}>
+          <input type="text" value={filters.company} onChange={e => updateF('company', e.target.value)}
+            placeholder="거래처명 검색" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="☆ 거래처 등급" k="ct2-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
+          <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
+        </FilterBtn>
+        <FilterBtn label="담당 구분" k="ct2-rl" openF={openF} setOpenF={setOpenF} hasValue={hasV('role')}>
+          <RadioOpts name="ct2-rl" opts={[['all','전체'],['주담당','주담당'],['실무','실무'],['보조','보조']]} value={filters.role} onChange={v => updateF('role', v)}/>
+        </FilterBtn>
+        <FilterBtn label="담당 세일즈" k="ct2-mg" openF={openF} setOpenF={setOpenF} hasValue={hasV('ourMgr')}>
+          <MultiOpts opts={['김민수','이수진','박준호','한소연','정대한','최지원']} selected={filters.ourMgr} onToggle={v => toggleArr('ourMgr', v)}/>
+        </FilterBtn>
+        <FilterBtn label="직책 키워드" k="ct2-tt" openF={openF} setOpenF={setOpenF} hasValue={hasV('title')}>
+          <input type="text" value={filters.title} onChange={e => updateF('title', e.target.value)}
+            placeholder="직책 검색 (예: 팀장)" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
+        </FilterBtn>
+        <FilterBtn label="📅 최근 연락일" k="ct2-lc" openF={openF} setOpenF={setOpenF} hasValue={hasV('lastContact')}>
+          <DateRange minVal={filters.lastContact[0]} maxVal={filters.lastContact[1]} onMin={v => updateF('lastContact', [v, filters.lastContact[1]])} onMax={v => updateF('lastContact', [filters.lastContact[0], v])}/>
+        </FilterBtn>
+        <FilterBtn label="핸드폰 유무" k="ct2-ph" openF={openF} setOpenF={setOpenF} hasValue={hasV('phone')}>
+          <RadioOpts name="ct2-ph" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.phone} onChange={v => updateF('phone', v)}/>
+        </FilterBtn>
+        <FilterBtn label="이메일 유무" k="ct2-em" openF={openF} setOpenF={setOpenF} hasValue={hasV('email')}>
+          <RadioOpts name="ct2-em" opts={[['all','전체'],['Y','Y'],['N','N']]} value={filters.email} onChange={v => updateF('email', v)}/>
+        </FilterBtn>
+        <select value={sort} onChange={e => setSort(e.target.value)}
+          className="ml-auto px-2.5 py-1.5 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value="recent">최근 연락순</option>
+          <option value="name">이름순</option>
+          <option value="grade">거래처 등급순</option>
+          <option value="company">소속 거래처순</option>
+        </select>
+      </div>
+
+      <div className="bg-white px-4 py-2 flex items-center justify-between flex-shrink-0 border-b border-slate-100 text-[12px]">
+        <div className="font-semibold">총 <span className="text-rose-600 font-bold">{filtered.length}</span> 명 · {page}/{totalPages} 페이지</div>
+        <select value={perPage} onChange={e => { setPerPage(+e.target.value); setPage(1); }}
+          className="px-2 py-1 text-[11px] border border-slate-200 rounded font-semibold text-slate-700 bg-white outline-none focus:border-indigo-400">
+          <option value={15}>15개씩</option>
+          <option value={30}>30개씩</option>
+          <option value={50}>50개씩</option>
+        </select>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-[11px] bg-white">
+          <thead className="bg-slate-50 sticky top-0 z-10">
+            <tr className="text-slate-500 font-semibold border-b border-slate-200">
+              <th className="px-3 py-2 text-left">담당자</th>
+              <th className="px-3 py-2 text-left">소속 거래처</th>
+              <th className="px-3 py-2 text-left">담당 구분</th>
+              <th className="px-3 py-2 text-left">핸드폰</th>
+              <th className="px-3 py-2 text-left">이메일</th>
+              <th className="px-3 py-2 text-center w-12">폰</th>
+              <th className="px-3 py-2 text-center w-12">메일</th>
+              <th className="px-3 py-2 text-left">최근 연락일</th>
+              <th className="px-3 py-2 text-left">담당 세일즈</th>
+              <th className="px-3 py-2 text-center w-24">상세</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.map(c => (
+              <tr key={c.id} onClick={() => onOpenContact(c.id)} className="border-b border-slate-100 hover:bg-sky-50/40 cursor-pointer transition">
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-900 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{contactInitials(c.name)}</div>
+                    <div>
+                      <div className="font-semibold text-slate-800">{c.name}</div>
+                      <div className="text-[10px] text-slate-500">{c.title}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <span className="font-semibold text-slate-700">{c.co}</span>
+                  <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.coGrade] || GRADE_STYLES.E}`}>{c.coGrade}</span>
+                </td>
+                <td className="px-3 py-2.5"><ContactRolePill role={c.role}/></td>
+                <td className="px-3 py-2.5 text-slate-600">{c.hasPhone ? c.phone : <span className="text-slate-400">미확보</span>}</td>
+                <td className="px-3 py-2.5 text-slate-600 truncate" title={c.email}>{c.hasEmail ? c.email : <span className="text-slate-400">미확보</span>}</td>
+                <td className="px-3 py-2.5 text-center font-bold" style={{color: c.hasPhone ? '#1D9E75' : '#aaa'}}>{c.hasPhone ? 'Y' : 'N'}</td>
+                <td className="px-3 py-2.5 text-center font-bold" style={{color: c.hasEmail ? '#1D9E75' : '#aaa'}}>{c.hasEmail ? 'Y' : 'N'}</td>
+                <td className="px-3 py-2.5 text-slate-500 tabular-nums">{c.lastContact}</td>
+                <td className="px-3 py-2.5 text-slate-600">{c.ourMgr}</td>
+                <td className="px-3 py-2.5 text-center">
+                  <button onClick={e => { e.stopPropagation(); onOpenContact(c.id); }}
+                    className="px-3 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">상세 보기</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white border-t border-slate-200 px-4 py-2 flex items-center justify-between text-[10px] flex-shrink-0">
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-slate-500">담당 구분:</span>
+          {['주담당','실무','보조'].map(r => <ContactRolePill key={r} role={r}/>)}
+          <span className="text-slate-400 ml-2">폰/메일 Y = 연락처 확보</span>
+        </div>
+        <div className="flex items-center gap-1 text-[11px]">
+          <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="px-2 py-0.5 disabled:opacity-30">‹</button>
+          {Array.from({length: totalPages}).map((_, i) => (
+            <button key={i} onClick={() => setPage(i+1)} className={`px-2 py-0.5 rounded ${page === i+1 ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-100'}`}>{i+1}</button>
+          ))}
+          <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="px-2 py-0.5 disabled:opacity-30">›</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactDetailPage({ contactId, onBack, onOpenCompany }) {
+  const c = CONTACTS.find(x => x.id === contactId);
+  if (!c) return <div className="flex-1 flex items-center justify-center text-slate-400">담당자 정보를 찾을 수 없습니다</div>;
+  const [memoInput, setMemoInput] = useState('');
+  const [addedMemos, setAddedMemos] = useState([]);
+  const addMemo = () => {
+    if (!memoInput.trim()) return;
+    const now = new Date();
+    const dt = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    setAddedMemos(prev => [{ d: dt, t: memoInput }, ...prev]);
+    setMemoInput('');
+  };
+  const KV = ({ k, v, tone }) => (
+    <React.Fragment>
+      <div className="bg-slate-50 px-3 py-2 text-[11px] text-slate-500 border-r border-b border-slate-100">{k}</div>
+      <div className={`px-3 py-2 text-[12px] font-semibold border-r border-b border-slate-100 ${tone === 'g' ? 'text-emerald-600' : tone === 'w' ? 'text-amber-600' : 'text-slate-800'}`}>{v}</div>
+    </React.Fragment>
+  );
+
+  return (
+    <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="bg-white border-b border-slate-200 px-5 py-2.5 flex items-center justify-between flex-shrink-0 sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 text-[12px] font-semibold">
+            <ChevronLeft size={14} /> 뒤로 가기
+          </button>
+          <div className="h-4 w-px bg-slate-200" />
+          <h1 className="font-bold text-[16px] text-slate-900">{c.name}</h1>
+          <span className="text-[11px] text-slate-500">({c.co})</span>
+          <ContactRolePill role={c.role}/>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="px-3 py-1.5 text-[11px] font-semibold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">수정</button>
+          <button onClick={() => onOpenCompany(c.companyId)} className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700">🏢 거래처 상세 →</button>
+        </div>
+      </div>
+      <div className="p-5">
+        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-14 h-14 rounded-full bg-sky-200 text-sky-900 flex items-center justify-center text-[14px] font-bold">{contactInitials(c.name)}</div>
+            <div className="flex-1">
+              <div className="text-[20px] font-bold text-sky-900 mb-1">{c.name}</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <ContactRolePill role={c.role}/>
+                <span className="text-[13px] text-sky-900 font-semibold">{c.title}</span>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="text-[13px] font-semibold">{c.co}</span>
+                <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.coGrade]}`}>{c.coGrade}</span>
+                <button onClick={() => onOpenCompany(c.companyId)} className="ml-2 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline">거래처 상세로 이동 →</button>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-white border border-sky-200 rounded-lg px-3 py-2"><div className="text-[10px] text-sky-700 font-semibold">핸드폰</div><div className={`text-[12px] font-bold mt-0.5 ${c.hasPhone ? 'text-emerald-600' : 'text-slate-400'}`}>{c.hasPhone ? c.phone : '미확보'}</div></div>
+            <div className="bg-white border border-sky-200 rounded-lg px-3 py-2"><div className="text-[10px] text-sky-700 font-semibold">이메일</div><div className={`text-[11px] font-bold mt-0.5 truncate ${c.hasEmail ? 'text-sky-900' : 'text-slate-400'}`}>{c.hasEmail ? c.email : '미확보'}</div></div>
+            <div className="bg-white border border-sky-200 rounded-lg px-3 py-2"><div className="text-[10px] text-sky-700 font-semibold">최근 연락일</div><div className="text-[12px] font-bold mt-0.5 text-sky-900">{c.lastContact}</div></div>
+            <div className="bg-white border border-sky-200 rounded-lg px-3 py-2"><div className="text-[10px] text-sky-700 font-semibold">담당 세일즈</div><div className="text-[12px] font-bold mt-0.5 text-sky-900">{c.ourMgr}</div></div>
+          </div>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-sky-50 text-sky-900">👤 담당자 기본 정보</div>
+        <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+          <KV k="이름" v={c.name}/>
+          <KV k="직책" v={c.title}/>
+          <KV k="담당 구분" v={<ContactRolePill role={c.role}/>}/>
+          <KV k="담당 세일즈" v={c.ourMgr}/>
+          <KV k="핸드폰" v={c.hasPhone ? c.phone : '미확보'} tone={c.hasPhone ? 'g' : ''}/>
+          <KV k="이메일" v={c.hasEmail ? c.email : '미확보'} tone={c.hasEmail ? 'g' : ''}/>
+          <KV k="최근 연락일" v={c.lastContact}/>
+          <KV k="" v=""/>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-emerald-50 text-emerald-900 flex items-center justify-between">
+          <span>🏢 소속 거래처 정보</span>
+          <button onClick={() => onOpenCompany(c.companyId)} className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded hover:bg-indigo-50">거래처 상세 보기 →</button>
+        </div>
+        <div className="grid grid-cols-4 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+          <KV k="거래처명" v={c.co}/>
+          <KV k="거래처 등급" v={<span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${GRADE_STYLES[c.coGrade]}`}>{c.coGrade}</span>}/>
+          <KV k="담당 구분" v={<ContactRolePill role={c.role}/>}/>
+          <KV k="" v=""/>
+        </div>
+
+        <div className="px-3 py-2 rounded-lg mt-4 mb-2 text-[12px] font-bold bg-slate-100 text-slate-700">🕒 연락 이력</div>
+        <div className="border border-indigo-200 rounded-lg overflow-hidden mb-3">
+          <div className="bg-indigo-50 px-3 py-2 text-[11px] font-semibold text-indigo-900 border-b border-indigo-200">✏️ 메모 직접 입력</div>
+          {addedMemos.map((m, i) => (
+            <div key={i} className="px-3 py-2 text-[12px] border-b border-slate-100 last:border-0 bg-white">
+              <span className="text-[10px] text-slate-400">{m.d}</span>
+              <div className="mt-0.5">{m.t}</div>
+            </div>
+          ))}
+          <textarea value={memoInput} onChange={e => setMemoInput(e.target.value)} rows={2}
+            placeholder="연락 메모를 입력하세요..."
+            className="w-full px-3 py-2 text-[12px] outline-none resize-none"/>
+          <div className="flex justify-end px-3 py-1.5 bg-slate-50 border-t border-slate-100">
+            <button onClick={addMemo} className="px-3 py-1 text-[11px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">메모 추가</button>
+          </div>
+        </div>
+        <div className="border border-slate-200 rounded-lg px-4">
+          {c.log.map((x, i) => (
+            <div key={i} className="flex gap-2 py-2.5 border-b border-slate-100 last:border-0">
+              <span className="w-2 h-2 rounded-full mt-1.5 bg-sky-500"/>
+              <div className="flex-1">
+                <div className="text-[10px] text-slate-500 mb-0.5">{x.d}</div>
+                <div className="text-[12px]">{x.m}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+ * 홈 대시보드
+ * ============================================================ */
+function HomeDashboard({ onNavigate }) {
+  const chartRef = React.useRef(null);
+  const chartInstanceRef = React.useRef(null);
+
+  // 데이터 집계 (실제 COMPANIES / DEALS / CONTRACTS 사용)
+  const gradeCount = useMemo(() => {
+    const g = { A:0, B:0, C:0, D:0, E:0, F:0 };
+    COMPANIES.forEach(c => { if (g[c.g] !== undefined) g[c.g]++; });
+    return g;
+  }, []);
+
+  const dealStats = useMemo(() => {
+    const byStatus = {};
+    DEALS.forEach(d => { byStatus[d.st] = (byStatus[d.st] || 0) + 1; });
+    const inProgress = DEALS.filter(d => d.st !== '완료' && d.st !== '무산');
+    return { byStatus, total: inProgress.length };
+  }, []);
+
+  const contractStats = useMemo(() => {
+    const now = new Date('2025-02-15');
+    const thisMonth = CONTRACTS.filter(c => {
+      const [y, m] = c.gen.split('.').map(Number);
+      return y === now.getFullYear() && m === now.getMonth() + 1;
+    });
+    const totalArea = CONTRACTS.reduce((s, c) => s + parseInt(c.area.replace(/[^0-9]/g, '') || 0), 0);
+    const totalCount = CONTRACTS.length;
+    // 수수료 = 보증금의 1% 가정 / 또는 임대료 1개월
+    const totalFee = CONTRACTS.reduce((s, c) => s + (c.rentNum || 0), 0);
+    const newCount = CONTRACTS.filter(c => c.type === '신규').length;
+    const renewCount = CONTRACTS.filter(c => c.type === '갱신').length;
+    return { thisMonth, totalArea, totalCount, totalFee, newCount, renewCount };
+  }, []);
+
+  // Chart.js 로드 + 그리기
+  useEffect(() => {
+    let cancelled = false;
+    const loadChart = () => {
+      if (window.Chart) {
+        drawChart();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+      script.onload = () => { if (!cancelled) drawChart(); };
+      document.head.appendChild(script);
+    };
+
+    const drawChart = () => {
+      if (!chartRef.current || !window.Chart) return;
+      if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+      chartInstanceRef.current = new window.Chart(chartRef.current, {
+        type: 'bar',
+        data: {
+          labels: ['A등급','B등급','C등급','D등급','E등급','F등급'],
+          datasets: [{
+            data: [gradeCount.A, gradeCount.B, gradeCount.C, gradeCount.D, gradeCount.E, gradeCount.F],
+            backgroundColor: ['#4F46E5','#10B981','#F59E0B','#EF4444','#64748B','#1F2937'],
+            borderRadius: 6,
+            borderSkipped: false,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + '개' } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: 'rgba(0,0,0,0.5)', font: { size: 11 } } },
+            y: { beginAtZero: true, ticks: { color: 'rgba(0,0,0,0.5)', font: { size: 11 }, stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.06)' } },
+          },
+        },
+      });
+    };
+
+    loadChart();
+    return () => {
+      cancelled = true;
+      if (chartInstanceRef.current) { chartInstanceRef.current.destroy(); chartInstanceRef.current = null; }
+    };
+  }, [gradeCount]);
+
+  const dealStatusColors = {
+    '검토중':   ['#EEEDFE','#534AB7','#4F46E5'],
+    '협의중':   ['#E6F1FB','#042C53','#185FA5'],
+    '제안완료': ['#FAEEDA','#633806','#BA7517'],
+    '계약진행': ['#E1F5EE','#085041','#0F6E56'],
+  };
+  const maxDealCount = Math.max(...Object.values(dealStats.byStatus), 1);
+
+  return (
+    <div className="flex-1 overflow-auto bg-slate-100 p-5">
+      {/* 헤더 */}
+      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-200">
+        <div>
+          <h1 className="text-[18px] font-semibold text-slate-900">홈 대시보드</h1>
+          <div className="text-[11px] text-slate-500 mt-1">{new Date().toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'})} · LM본부 관리자 장한덕</div>
+        </div>
+        <span className="text-[11px] bg-white border border-slate-200 px-3 py-1.5 rounded-md text-slate-600">📅 2025년 기준</span>
+      </div>
+
+      {/* Row 1: 거래처 등급 차트 + 진행중 딜 + 이번달 계약 */}
+      <div className="grid gap-3.5 mb-3.5" style={{gridTemplateColumns: '1fr 200px 220px'}}>
+        {/* 거래처 등급별 */}
+        <div onClick={() => onNavigate('companiesAll')} className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition">
+          <div className="text-[12px] font-medium text-slate-500 mb-2.5 flex items-center gap-1.5">
+            <Briefcase size={13} strokeWidth={1.75} className="text-indigo-600"/>
+            전체 거래처 등급별 수량
+          </div>
+          <div className="flex gap-2.5 flex-wrap mb-3 text-[11px] text-slate-600">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-indigo-600"/>A {gradeCount.A}개</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-600"/>B {gradeCount.B}개</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-600"/>C {gradeCount.C}개</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-rose-600"/>D {gradeCount.D}개</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-slate-500"/>E {gradeCount.E}개</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-slate-800"/>F {gradeCount.F}개</span>
+          </div>
+          <div style={{position: 'relative', height: 165}}>
+            <canvas ref={chartRef}></canvas>
+          </div>
+        </div>
+
+        {/* 진행중 딜 */}
+        <div onClick={() => onNavigate('dealsAll')} className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:border-amber-300 hover:shadow-sm transition">
+          <div className="text-[12px] font-medium text-slate-500 mb-2.5 flex items-center gap-1.5">
+            <Sparkles size={13} strokeWidth={1.75} className="text-amber-700"/>
+            진행중인 딜
+          </div>
+          <div className="text-[36px] font-medium leading-none mb-1 text-amber-700">{dealStats.total}</div>
+          <div className="text-[11px] text-slate-500 mb-3">건 진행중</div>
+          <div className="border-t border-slate-100 pt-2.5 space-y-1.5">
+            {Object.entries(dealStats.byStatus).filter(([k]) => k !== '완료' && k !== '무산').map(([k, v]) => {
+              const [bg, c] = dealStatusColors[k] || ['#f2f2f0','#888'];
+              return (
+                <div key={k} className="flex justify-between items-center">
+                  <span className="text-[11px] text-slate-600">{k}</span>
+                  <span style={{background: bg, color: c}} className="text-[11px] font-medium px-2 py-0.5 rounded">{v}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 이번달 계약 완료 */}
+        <div onClick={() => onNavigate('contractsAll')} className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:border-emerald-300 hover:shadow-sm transition">
+          <div className="text-[12px] font-medium text-slate-500 mb-2.5 flex items-center gap-1.5">
+            <FileText size={13} strokeWidth={1.75} className="text-emerald-700"/>
+            이번달 계약 완료
+          </div>
+          <div className="text-[36px] font-medium leading-none mb-1 text-emerald-700">{contractStats.thisMonth.length}</div>
+          <div className="text-[11px] text-slate-500 mb-3">건 완료</div>
+          <div className="border-t border-slate-100 pt-2.5 space-y-2">
+            {contractStats.thisMonth.length === 0 ? (
+              <div className="text-[11px] text-slate-400">이번달 완료 계약 없음</div>
+            ) : contractStats.thisMonth.map((c, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-600 mt-1.5"/>
+                <div>
+                  <div className="text-[11px] font-medium text-slate-800">{c.co}</div>
+                  <div className="text-[10px] text-slate-500">{c.area}평 · {c.region}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Row 2: 딜 상태별 현황 */}
+      <div onClick={() => onNavigate('dealsAll')} className="bg-white rounded-xl border border-slate-200 p-4 mb-3.5 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition">
+        <div className="text-[12px] font-medium text-slate-500 mb-3 flex items-center gap-1.5">
+          📊 딜 상태별 현황
+        </div>
+        <div className="space-y-2.5">
+          {Object.keys(dealStatusColors).map(st => {
+            const cnt = dealStats.byStatus[st] || 0;
+            const pct = (cnt / maxDealCount) * 100;
+            const [bg, c, fill] = dealStatusColors[st];
+            return (
+              <div key={st} className="flex items-center gap-3">
+                <div className="w-16 flex-shrink-0 text-right">
+                  <span style={{background: bg, color: c}} className="text-[11px] font-medium px-2 py-0.5 rounded">{st}</span>
+                </div>
+                <div className="flex-1 h-8 bg-slate-100 rounded-md overflow-hidden">
+                  <div style={{width: pct + '%', background: fill}} className="h-full rounded-md flex items-center justify-end pr-3">
+                    <span className="text-[11px] font-medium text-white">{cnt}건</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-end mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500">
+          전체 <strong className="text-slate-800 mx-1">{dealStats.total}건</strong> 진행중
+        </div>
+      </div>
+
+      {/* Row 3: 올해 총 계약 실적 */}
+      <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
+        <div className="text-[12px] font-medium text-slate-500 mb-3.5 flex items-center gap-1.5">
+          📅 올해 총 계약 실적 <span className="text-[11px] font-normal text-slate-400 ml-1">(2025년 누계)</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-lg p-4 border border-slate-100">
+            <div className="text-[12px] text-slate-500 mb-1.5">총 계약 면적</div>
+            <div className="text-[28px] font-medium leading-none text-indigo-600">{contractStats.totalArea.toLocaleString()}</div>
+            <div className="text-[12px] text-slate-500 mt-1">평</div>
+            <div className="mt-2.5 text-[11px] text-slate-500">월평균 <strong className="text-indigo-600">{Math.round(contractStats.totalArea / 6).toLocaleString()} 평</strong></div>
+          </div>
+          <div className="bg-white rounded-lg p-4 border border-slate-100">
+            <div className="text-[12px] text-slate-500 mb-1.5">총 계약 건수</div>
+            <div className="text-[28px] font-medium leading-none text-emerald-600">{contractStats.totalCount}</div>
+            <div className="text-[12px] text-slate-500 mt-1">건</div>
+            <div className="mt-2.5 text-[11px] text-slate-500">신규 <strong className="text-emerald-600">{contractStats.newCount}건</strong> · 갱신 <strong className="text-emerald-600">{contractStats.renewCount}건</strong></div>
+          </div>
+          <div className="bg-white rounded-lg p-4 border border-slate-100">
+            <div className="text-[12px] text-slate-500 mb-1.5">월 임대료 총액</div>
+            <div className="text-[28px] font-medium leading-none text-amber-700">{(contractStats.totalFee/10000).toFixed(2)}억</div>
+            <div className="text-[12px] text-slate-500 mt-1">만원/월</div>
+            <div className="mt-2.5 text-[11px] text-slate-500">건당 평균 <strong className="text-amber-700">{Math.round(contractStats.totalFee / contractStats.totalCount).toLocaleString()}만원/월</strong></div>
+          </div>
         </div>
       </div>
     </div>
