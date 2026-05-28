@@ -731,7 +731,7 @@ const NAV_SECTIONS = [
     { icon: Home, label: '홈 대시보드' }
   ]},
   { divider: true, items: [
-    { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'], active: true, activeChild: '지도' },
+    { icon: Building2, label: '빌딩', children: ['지도', '전체 빌딩'] },
     { icon: Briefcase, label: '거래처', children: ['전체 거래처', 'My 거래처'] },
   ]},
   { divider: true, items: [
@@ -1128,8 +1128,8 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
       <nav className="flex-1 overflow-y-auto py-2">
         {NAV_SECTIONS.map((section, sIdx) => (
           <React.Fragment key={sIdx}>
-            {section.divider && open && <div className="border-t border-slate-700/30 my-2 mx-3"/>}
-            {section.divider && !open && <div className="border-t border-slate-700/30 my-2 mx-2"/>}
+            {section.divider && open && <div className="my-1"/>}
+            {section.divider && !open && <div className="my-1"/>}
             {section.items.map(item => {
               const Icon = item.icon;
               const hasChildren = !!item.children;
@@ -1146,8 +1146,9 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
                   }}
                     className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer transition select-none border-b border-slate-700/20 ${
                       isAdmin ? 'text-rose-300 hover:bg-rose-900/20' :
-                      currentPage === CHILD_TO_PAGE[item.label] ? 'text-white bg-slate-700/30' :
-                      item.active ? 'text-white bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/30'
+                      (!hasChildren && currentPage === CHILD_TO_PAGE[item.label]) ? 'text-white bg-slate-700/30' :
+                      (hasChildren && item.children.some(ch => CHILD_TO_PAGE[ch] === currentPage)) ? 'text-white bg-slate-700/30' :
+                      'text-slate-300 hover:bg-slate-700/30'
                     }`}>
                     <Icon size={13} strokeWidth={1.75} />
                     {open && <span className="font-medium flex-1">{item.label}</span>}
