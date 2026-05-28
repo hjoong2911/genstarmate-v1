@@ -1131,9 +1131,16 @@ function Sidebar({ open, onToggle, currentPage, onNavigate }) {
               const isAdmin = section.admin;
               return (
                 <div key={item.label}>
-                  <div onClick={() => hasChildren && toggle(item.label)}
+                  <div onClick={() => {
+                    if (hasChildren) { toggle(item.label); }
+                    else {
+                      const pageKey = CHILD_TO_PAGE[item.label];
+                      if (pageKey && onNavigate) onNavigate(pageKey);
+                    }
+                  }}
                     className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer transition select-none ${
                       isAdmin ? 'text-rose-300 hover:bg-rose-900/20' :
+                      currentPage === CHILD_TO_PAGE[item.label] ? 'text-white bg-slate-700/30' :
                       item.active ? 'text-white bg-slate-700/30' : 'text-slate-300 hover:bg-slate-700/30'
                     }`}>
                     <Icon size={13} strokeWidth={1.75} />
