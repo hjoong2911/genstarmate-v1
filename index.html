@@ -765,7 +765,7 @@ const FILTER_DEFS = [
 ];
 
 const INITIAL_FILTERS = FILTER_DEFS.reduce((acc, def) => {
-  acc[def.key] = def.type === 'range' ? { min: '', max: '' } : (def.type === 'multi' ? [] : null);
+  acc[def.key] = def.type === 'range' ? { min: '', max: '' } : (def.type === 'multi' || def.type === 'yn' ? [] : null);
   return acc;
 }, {});
 
@@ -873,9 +873,12 @@ function GenstarMate() {
         if (nc.max !== '' && +nc.max > 0 && !b.vacancies.some(v => v.noc && v.noc <= +nc.max)) return false;
       }
 
-      // 전속 Y/N
-      if (filters.exclusive === 'Y' && !b.exclusive) return false;
-      if (filters.exclusive === 'N' && b.exclusive) return false;
+      // 전속 Y/N (checkbox 배열)
+      const _exc = Array.isArray(filters.exclusive) ? filters.exclusive : (filters.exclusive ? [filters.exclusive] : []);
+      if (_exc.length > 0) {
+        const v = b.exclusive ? 'Y' : 'N';
+        if (!_exc.includes(v)) return false;
+      }
 
       // 층수 (공실 층 기준)
       if (filters.floors.length > 0) {
@@ -892,10 +895,13 @@ function GenstarMate() {
         if (!hasMatch) return false;
       }
 
-      // 공실 Y/N
+      // 공실 Y/N (checkbox 배열)
       const hasVacancy = b.vacancies.length > 0;
-      if (filters.vacancy === 'Y' && !hasVacancy) return false;
-      if (filters.vacancy === 'N' && hasVacancy) return false;
+      const _vac = Array.isArray(filters.vacancy) ? filters.vacancy : (filters.vacancy ? [filters.vacancy] : []);
+      if (_vac.length > 0) {
+        const v = hasVacancy ? 'Y' : 'N';
+        if (!_vac.includes(v)) return false;
+      }
 
       // 주차
       if (filters.parking.length > 0 && !filters.parking.includes(b.parking)) return false;
@@ -903,9 +909,9 @@ function GenstarMate() {
       // 소유주 유형
       if (filters.ownerType.length > 0 && !filters.ownerType.includes(b.ownerType)) return false;
 
-      // 매각 희망 Y/N
-      if (filters.forSale === 'Y' && b.forSale !== 'Y') return false;
-      if (filters.forSale === 'N' && b.forSale !== 'N') return false;
+      // 매각 희망 Y/N (checkbox 배열)
+      const _fs = Array.isArray(filters.forSale) ? filters.forSale : (filters.forSale ? [filters.forSale] : []);
+      if (_fs.length > 0 && !_fs.includes(b.forSale)) return false;
 
       // 건물 주용도
       if (filters.mainUse.length > 0 && !filters.mainUse.includes(b.mainUse)) return false;
@@ -1249,7 +1255,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
               </button>
 
               {isOpen && (
-                <div className="absolute top-full left-0 mt-1.5 z-50 bg-white rounded-xl shadow-2xl border border-slate-200 p-3.5 min-w-[280px]">
+                <div className="absolute top-full left-0 mt-1.5 z-50 bg-white rounded-lg shadow-xl border border-slate-200 p-3 min-w-[200px]">
                   <div className="text-[11px] font-bold text-slate-700 mb-2.5">
                     {def.label} {def.unit && <span className="text-slate-400 font-normal">({def.unit})</span>}
                   </div>
@@ -1267,14 +1273,22 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
                   )}
 
                   {def.type === 'yn' && (
-                    <div className="flex gap-1.5">
-                      {['Y', 'N'].map(opt => (
-                        <button key={opt}
-                          onClick={() => setFilters({ ...filters, [def.key]: val === opt ? null : opt })}
-                          className={`flex-1 px-4 py-1.5 text-[11px] font-bold rounded-md transition ${val === opt ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                          {opt}
-                        </button>
-                      ))}
+                    <div className="flex flex-col gap-0.5">
+                      {['Y', 'N'].map(opt => {
+                        const arr = Array.isArray(val) ? val : (val ? [val] : []);
+                        const selected = arr.includes(opt);
+                        return (
+                          <label key={opt} className="flex items-center gap-2 px-1.5 py-1 text-[12px] hover:bg-slate-50 rounded cursor-pointer">
+                            <input type="checkbox" checked={selected}
+                              onChange={() => {
+                                const next = selected ? arr.filter(x => x !== opt) : [...arr, opt];
+                                setFilters({ ...filters, [def.key]: next });
+                              }}
+                              className="accent-indigo-600"/>
+                            {opt}
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -3764,6 +3778,7 @@ function MultiOpts({ opts, selected, onToggle, renderLabel, keyOf }) {
 }
 
 function RadioOpts({ name, opts, value, onChange }) {
+  // Converted to checkbox-style (single select via radio behavior maintained)
   return (
     <div className="flex flex-col gap-0.5">
       {opts.map(([v, l]) => (
@@ -3771,6 +3786,26 @@ function RadioOpts({ name, opts, value, onChange }) {
           <input type="radio" name={name} checked={value === v}
             onChange={() => onChange(v)} className="accent-indigo-600"/>
           {l}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/* Y/N 체크박스 (전체 = 둘 다 미선택 또는 둘 다 선택) */
+function YNCheck({ value, onChange }) {
+  const arr = Array.isArray(value) ? value : (value === 'Y' || value === 'N' ? [value] : []);
+  const toggle = (v) => {
+    const next = arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+    onChange(next);
+  };
+  return (
+    <div className="flex flex-col gap-0.5">
+      {['Y','N'].map(v => (
+        <label key={v} className="flex items-center gap-2 px-1.5 py-1 text-[12px] hover:bg-slate-50 rounded cursor-pointer">
+          <input type="checkbox" checked={arr.includes(v)}
+            onChange={() => toggle(v)} className="accent-indigo-600"/>
+          {v}
         </label>
       ))}
     </div>
