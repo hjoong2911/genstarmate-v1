@@ -803,6 +803,700 @@ const avgVacancyNoc  = (b) => b.vacancies.length > 0
   ? Math.round(b.vacancies.reduce((s, v) => s + v.noc, 0) / b.vacancies.length) : 0;
 
 /* ============================================================
+ * 🤖 AI 챗봇 검색 (데모용 자연어 인식 — Claude API 미사용)
+ *   - 자연어 입력 → 구조화된 필터 조건(conds)으로 변환
+ *   - 현재 보고 있는 목록(거래처/딜/계약/빌딩)에 적용
+ *   - 조건은 칩(chip)으로 표시되어 개별 삭제(수정) 가능
+ * ============================================================ */
+const Send          = (p) => <Svg {...p}><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></Svg>;
+const MessageSquare = (p) => <Svg {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Svg>;
+
+/* 권역 키워드 사전 — 자연어의 지역어를 권역 코드로 매핑 */
+const CHAT_REGIONS = [
+  { code:'GBD',    name:'강남권(GBD)',   kw:['강남','서초','테헤란','역삼','삼성동','선릉','논현','신논현','강남권','gbd'] },
+  { code:'CBD',    name:'도심권(CBD)',   kw:['도심','광화문','종로','시청','을지로','중구','세종대로','남대문','명동','충정로','cbd','도심권'] },
+  { code:'YBD',    name:'여의도권(YBD)', kw:['여의도','영등포','ybd','여의도권'] },
+  { code:'BBD',    name:'분당권(BBD)',   kw:['분당','판교','성남','bbd','분당권'] },
+  { code:'OTHERS', name:'기타권역',      kw:['성수','성동','마곡','용산','송파','잠실'] },
+];
+
+const CHAT_TYPE_LABEL = { companies:'거래처', deals:'딜', contracts:'계약', buildings:'빌딩' };
+
+function chatGetDataset(type){
+  return type==='companies' ? COMPANIES : type==='deals' ? DEALS : type==='contracts' ? CONTRACTS : BUILDINGS;
+}
+function chatPageToType(pv){
+  if(/^companies/.test(pv)) return 'companies';
+  if(/^deals/.test(pv))     return 'deals';
+  if(/^contracts/.test(pv)) return 'contracts';
+  if(pv==='allBuildings'||pv==='map'||pv==='detail') return 'buildings';
+  return null;
+}
+const chatNum = (s) => parseInt(String(s).replace(/[^0-9]/g,'')) || 0;
+const rangeHit = (v, mn, mx) => v!=null && (mn==null || v>=mn) && (mx==null || v<=mx);
+/* "30만원" "1.2억" "300000원" → 정수(원) */
+function parseWon(numStr, unit){
+  let n = parseFloat(String(numStr).replace(/,/g,''));
+  if(!isFinite(n)) return null;
+  if(unit==='억') n *= 1e8; else if(unit==='만') n *= 1e4;
+  return Math.round(n);
+}
+function wonLabel(v){
+  if(v>=1e8) return (v/1e8).toLocaleString()+'억';
+  if(v>=1e4) return (v/1e4).toLocaleString()+'만원';
+  return v.toLocaleString()+'원';
+}
+const _n = (s) => parseFloat(String(s).replace(/,/g,''));
+/* 일반 숫자 범위 파서 — A~B / A 이상 / B 이하 / A부터 B / bare. unit은 정규식 토큰(예 '%','평','층','대','년') */
+function parseRange(str, unit){
+  const u = unit ? '\\s*'+unit : '';
+  let m;
+  if((m = str.match(new RegExp('(\\d[\\d,\\.]*)'+u+'?\\s*(?:~|-|부터|에서)\\s*(\\d[\\d,\\.]*)'+u+'?\\s*(?:사이|이내)?'))))
+    return { min:_n(m[1]), max:_n(m[2]), raw:m[0] };
+  if((m = str.match(new RegExp('(\\d[\\d,\\.]*)'+u+'?\\s*(?:이하|미만|이내|까지|이전)'))))
+    return { min:null, max:_n(m[1]), raw:m[0] };
+  if((m = str.match(new RegExp('(\\d[\\d,\\.]*)'+u+'?\\s*(?:이상|초과|넘|부터|이후)'))))
+    return { min:_n(m[1]), max:null, raw:m[0] };
+  if(unit && (m = str.match(new RegExp('(\\d[\\d,\\.]*)\\s*'+unit))))
+    return { min:_n(m[1]), max:null, raw:m[0] };
+  return null;
+}
+/* 금액(만/억/원) 범위 파서 */
+function parseWonRange(str){
+  let m;
+  if((m = str.match(/([\d.,]+)\s*(억|만)?\s*원?\s*(?:~|-|부터|에서)\s*([\d.,]+)\s*(억|만)?\s*원?\s*(?:사이|이내)?/)))
+    return { min:parseWon(m[1],m[2]), max:parseWon(m[3],m[4]||m[2]), raw:m[0] };
+  if((m = str.match(/([\d.,]+)\s*(억|만)?\s*원?\s*(?:이하|미만|이내|까지)/)))
+    return { min:null, max:parseWon(m[1],m[2]), raw:m[0] };
+  if((m = str.match(/([\d.,]+)\s*(억|만)?\s*원?\s*(?:이상|초과|넘|부터)?/)))
+    return { min:parseWon(m[1],m[2]), max:null, raw:m[0] };
+  return null;
+}
+function rangeLabel(name, r, unitLabel){
+  const u = unitLabel||'';
+  if(r.min!=null && r.max!=null) return name+' '+r.min+'~'+r.max+u;
+  if(r.max!=null) return name+' '+r.max+u+' 이하';
+  return name+' '+r.min+u+' 이상';
+}
+
+/* ── 항목별 필드 추출기 ── */
+function chatItemArea(item, type, metric){
+  if(type==='companies') return chatNum(item.예면) || chatNum(item.현);
+  if(type==='deals')     return chatNum(item.area);
+  if(type==='contracts') return chatNum(item.area);
+  if(type==='buildings'){
+    if(metric==='lease') return Math.round(item.baseLease||0);          // 기준층 임대
+    if(metric==='vac')   return Math.round((item.vacancies||[]).reduce((s,v)=>s+(v.net||0),0)); // 전체 공실 전용
+    if(metric==='gross') return Math.round(item.area||0);               // 연면적
+    return Math.round(item.baseNet||0);                                  // 기준층 전용 (기본)
+  }
+  return 0;
+}
+function chatItemIsNew(item, type){
+  if(type!=='buildings') return true; // 건물 연식 데이터가 없는 목록엔 적용 안 함
+  return (item.built||0) >= 2010 || (item.renovated||0) >= 2018;
+}
+function chatItemGrade(item, type){
+  if(type==='companies') return item.g;
+  if(type==='deals'||type==='contracts') return item.cg;
+  return null; // 빌딩은 등급 없음 → 통과
+}
+function chatRegionMatch(item, c, type){
+  const kws = c.kw;
+  const hit = (s) => s && kws.some(k => String(s).toLowerCase().includes(k));
+  if(type==='buildings') return item.region===c.code || hit(item.address) || hit(item.name) || hit(item.alias);
+  if(type==='deals')     return item.region===c.code || item.currentRegion===c.code || item.desiredRegion===c.code || hit(item.b1) || hit(item.b2) || hit(item.currentRegion) || hit(item.desiredRegion);
+  if(type==='contracts') return item.region===c.code || hit(item.bld);
+  if(type==='companies') return hit(item.주소) || hit(item.빌);
+  return true;
+}
+function chatSizeMatch(item, c, type){
+  if(c.scope==='company')  { if(type!=='companies') return true; return String(item.규||'').includes(c.value); }
+  if(c.scope==='building') { if(type!=='buildings') return true; return String(item.scale||'').includes(c.value); }
+  return true;
+}
+function chatStatusMatch(item, c, type){
+  const norm = (s) => String(s||'').replace(/\s/g,'');
+  const v = norm(c.value);
+  if(type==='deals')     return norm(item.st).includes(v) || norm(item.progress).includes(v) || v.includes(norm(item.st));
+  if(type==='contracts') return norm(item.st).includes(v) || v.includes(norm(item.st));
+  return true; // 거래처/빌딩엔 상태 개념이 없으므로 통과
+}
+function chatManagerMatch(item, c, type){
+  if(type==='companies') return item.담===c.value;
+  if(type==='deals'||type==='contracts') return item.mgr===c.value;
+  return true;
+}
+function chatKeywordMatch(item, c, type){
+  const v = c.value;
+  if(type==='companies') return String(item.n||'').includes(v);
+  if(type==='deals'||type==='contracts') return String(item.co||'').includes(v);
+  if(type==='buildings') return [item.name,item.alias,item.address].some(s=>s&&String(s).includes(v));
+  return true;
+}
+/* 빌딩 상세 페이지 필드 getter — 패널에 없어도 텍스트로 호출 가능 (단일 진실원천) */
+const BLD_FIELD_GET = {
+  built:     b => b.built||0,
+  renovated: b => b.renovated||0,
+  gross:     b => Math.round(b.area||0),
+  above:     b => b.aboveFloors||0,
+  below:     b => b.belowFloors||0,
+  occ:       b => b.occupancy||0,
+  parkTotal: b => (b.parkingDetail && b.parkingDetail.total)||0,
+  ev:        b => (b.elevators && b.elevators.total)||0,
+  rent:      b => (b.baseStandard && b.baseStandard.rent)||0,
+  mgmt:      b => (b.baseStandard && b.baseStandard.mgmt)||0,
+};
+
+function chatCondMatch(item, c, type){
+  switch(c.kind){
+    case 'region':   return chatRegionMatch(item, c, type);
+    case 'areaMin':
+      if(type==='buildings' && c.metric==='floorvac') return (item.vacancies||[]).some(v=>(v.net||0)>=c.value);
+      { const a=chatItemArea(item,type,c.metric); return a>0 && a>=c.value; }
+    case 'areaMax':
+      if(type==='buildings' && c.metric==='floorvac') return (item.vacancies||[]).some(v=>(v.net||0)<=c.value);
+      { const a=chatItemArea(item,type,c.metric); return a>0 && a<=c.value; }
+    case 'new':      return chatItemIsNew(item, type);
+    case 'grade':    { const g=chatItemGrade(item,type); return g==null ? true : g===c.value; }
+    case 'sizeClass':return chatSizeMatch(item, c, type);
+    case 'status':   return chatStatusMatch(item, c, type);
+    case 'manager':  return chatManagerMatch(item, c, type);
+    case 'keyword':  return chatKeywordMatch(item, c, type);
+    // ── 빌딩 전용: 금액 범위 (패널과 동일한 계산식) ──
+    case 'monthlyFee': if(type!=='buildings') return true; return rangeHit(item.noc, c.min, c.max);           // 월 고정비 = NOC(원/평)
+    case 'deposit':    if(type!=='buildings') return true; return rangeHit(item.noc*10, c.min, c.max);         // 보증금 = NOC×10 (패널 근사식)
+    case 'noc': {
+      if(type!=='buildings') return true;
+      const has=(item.vacancies||[]).some(v=>v.noc>0);
+      if(!has) return true; // NOC 정보 없는 빌딩은 패널과 동일하게 통과
+      return (c.min==null||item.vacancies.some(v=>v.noc&&v.noc>=c.min)) && (c.max==null||item.vacancies.some(v=>v.noc&&v.noc<=c.max));
+    }
+    // ── 빌딩 전용: 범주형 ──
+    case 'bldExclusive': if(type!=='buildings') return true; return (item.exclusive?'Y':'N')===c.value;
+    case 'bldVacancy':   if(type!=='buildings') return true; return (((item.vacancies||[]).length>0)?'Y':'N')===c.value;
+    case 'bldForSale':   if(type!=='buildings') return true; return (item.forSale||'N')===c.value;
+    case 'bldMulti':     if(type!=='buildings') return true; return item[c.fkey]===c.value;
+    case 'fieldRange':   if(type!=='buildings') return true; { const v=(BLD_FIELD_GET[c.fkey]||(()=>null))(item); return rangeHit(v, c.min, c.max); }
+    default: return true;
+  }
+}
+/* 같은 그룹(권역·등급·주차 옵션 등)은 OR, 다른 그룹끼리는 AND */
+function chatCondGroup(c){
+  if(c.group) return c.group;
+  if(c.kind==='fieldRange') return c.id;          // 필드별 AND (준공 ↔ 전용률 등)
+  if(c.kind==='bldMulti')   return 'bldMulti:'+c.fkey; // 같은 항목 옵션끼리 OR, 항목 간 AND
+  return c.kind;
+}
+function applyChatConds(arr, conds, type){
+  if(!conds || !conds.length) return arr;
+  const byGroup = {};
+  conds.forEach(c => { const g=chatCondGroup(c); (byGroup[g] = byGroup[g] || []).push(c); });
+  return arr.filter(item => {
+    for(const g in byGroup){
+      if(!byGroup[g].some(c => chatCondMatch(item, c, type))) return false;
+    }
+    return true;
+  });
+}
+
+/* ── 자연어 → 조건 파서 ── */
+function parseChatQuery(text){
+  const raw = (text||'').trim();
+  const low = ' ' + raw.toLowerCase() + ' ';
+  const conds = [];
+  const push = (c) => { if(!conds.find(x => x.id===c.id)) conds.push(c); };
+
+  // 대상 목록 추론 (우선순위: 빌딩 → 계약 → 딜 → 거래처)
+  let target = null;
+  if(/(빌딩|건물|매물|오피스|사옥)/.test(raw)) target='allBuildings';
+  else if(/(계약|임대차)/.test(raw))           target='contractsAll';
+  else if(/(딜|파이프라인)/.test(raw))          target='dealsAll';
+  else if(/(거래처|고객|회사|클라이언트)/.test(raw)) target='companiesAll';
+
+  // 면적(평) — 빌딩 기준: 기준층 전용(net) 기본 / 임대·전체공실·층공실·연면적 전환
+  const areaMetric = /연\s*면적/.test(raw) ? 'gross'
+    : /층\s*공실/.test(raw) ? 'floorvac'
+    : /전체\s*공실|총\s*공실|공실/.test(raw) ? 'vac'
+    : /임대\s*면적|임대평|임대/.test(raw) ? 'lease'
+    : 'net';
+  const AREA_PFX = { net:'전용 ', lease:'임대 ', vac:'공실 ', floorvac:'층공실 ', gross:'연면적 ' };
+  const areaPfx = /전용|임대|공실|연\s*면적/.test(raw) ? AREA_PFX[areaMetric] : '';
+  let work = raw;
+  if(/평/.test(raw)){
+    let m;
+    if((m = work.match(/(\d[\d,\.]*)\s*평?\s*(?:~|-|부터|에서)\s*(\d[\d,\.]*)\s*평\s*(?:사이|이내)?/))){
+      push({kind:'areaMin',value:_n(m[1]),metric:areaMetric,id:'areaMin',label:areaPfx+_n(m[1])+'평 이상'});
+      push({kind:'areaMax',value:_n(m[2]),metric:areaMetric,id:'areaMax',label:areaPfx+_n(m[2])+'평 이하'});
+      work=work.replace(m[0],' ');
+    } else if((m = work.match(/(\d[\d,\.]*)\s*평\s*(?:이하|미만|이내|까지)/))){
+      push({kind:'areaMax',value:_n(m[1]),metric:areaMetric,id:'areaMax',label:areaPfx+_n(m[1])+'평 이하'}); work=work.replace(m[0],' ');
+    } else if((m = work.match(/(\d[\d,\.]*)\s*평\s*(?:이상|넘|초과|부터)?/))){
+      push({kind:'areaMin',value:_n(m[1]),metric:areaMetric,id:'areaMin',label:areaPfx+_n(m[1])+'평 이상'}); work=work.replace(m[0],' ');
+    }
+  }
+
+  // 금액 범위 필터 — NOC / 월 고정비 / 보증금 (키워드 기준 스코프 + 범위 지원, 패널과 동일 계산식)
+  [{kind:'monthlyFee',re:/고정비/,label:'월 고정비'},
+   {kind:'deposit',re:/보증금/,label:'보증금'},
+   {kind:'noc',re:/noc/i,label:'NOC'}].forEach(md => {
+    const idx = raw.search(md.re); if(idx<0) return;
+    const r = parseWonRange(raw.slice(idx));
+    if(!r || (r.min==null && r.max==null)) return;
+    const lbl = (r.min!=null&&r.max!=null) ? md.label+' '+wonLabel(r.min)+'~'+wonLabel(r.max)
+              : r.max!=null ? md.label+' '+wonLabel(r.max)+' 이하'
+              : md.label+' '+wonLabel(r.min)+' 이상';
+    push({kind:md.kind, id:md.kind, min:r.min, max:r.max, label:lbl});
+  });
+
+  // 상세 페이지 필드 (패널에 없어도 텍스트로 호출) — 범위(~)·이상·이하 모두 지원, 값은 고정 아닌 일반 파싱
+  const fieldNum = (kwRe, unit) => { const i = raw.search(kwRe); return i<0 ? null : parseRange(raw.slice(i), unit); };
+  const numLbl = (name, r, u) => (r.min!=null && r.max!=null) ? name+' '+r.min+u+'~'+r.max+u
+    : r.max!=null ? name+' '+r.max+u+' 이하' : name+' '+r.min+u+' 이상';
+  let r;
+  // 준공년도
+  if((r = fieldNum(/준공/, '년'))) push({kind:'fieldRange',fkey:'built',id:'fr:built',min:r.min,max:r.max,label:numLbl('준공',r,'년')});
+  // 리모델링 (연도 또는 여부)
+  if(/리모델/.test(raw)){
+    if((r = fieldNum(/리모델/, '년'))) push({kind:'fieldRange',fkey:'renovated',id:'fr:renovated',min:r.min,max:r.max,label:numLbl('리모델링',r,'년')});
+    else push({kind:'fieldRange',fkey:'renovated',id:'fr:renovated',min:1,max:null,label:'리모델링 건물'});
+  }
+  // 전용률 (%)
+  if((r = fieldNum(/전용률/, '%'))) push({kind:'fieldRange',fkey:'occ',id:'fr:occ',min:r.min,max:r.max,label:numLbl('전용률',r,'%')});
+  // 지상 층수 (한정어/범위가 있을 때만 — 공실 "9층" 등과 구분)
+  if((r = parseRange(raw, '층')) && /이상|이하|초과|미만|~|-|부터|에서|사이/.test(r.raw) && !/공실/.test(raw))
+    push({kind:'fieldRange',fkey:'above',id:'fr:above',min:r.min,max:r.max,label:numLbl('지상',r,'층')});
+  // 총 주차대수
+  if((r = fieldNum(/주차/, '대'))) push({kind:'fieldRange',fkey:'parkTotal',id:'fr:parkTotal',min:r.min,max:r.max,label:numLbl('주차',r,'대')});
+  // 엘리베이터
+  if((r = fieldNum(/엘리베이터|승강기|e\/?v/i, '대'))) push({kind:'fieldRange',fkey:'ev',id:'fr:ev',min:r.min,max:r.max,label:numLbl('E/V',r,'대')});
+  // 임대료 / 관리비 평단가 (원/평) — 실제 기준층 평단가
+  [{fkey:'rent',re:/임대료/,label:'임대료'},{fkey:'mgmt',re:/관리비/,label:'관리비'}].forEach(fd => {
+    const i = raw.search(fd.re); if(i<0) return;
+    const wr = parseWonRange(raw.slice(i)); if(!wr || (wr.min==null && wr.max==null)) return;
+    const lbl = (wr.min!=null&&wr.max!=null) ? fd.label+' '+wonLabel(wr.min)+'~'+wonLabel(wr.max)
+      : wr.max!=null ? fd.label+' '+wonLabel(wr.max)+' 이하' : fd.label+' '+wonLabel(wr.min)+' 이상';
+    push({kind:'fieldRange',fkey:fd.fkey,id:'fr:'+fd.fkey,min:wr.min,max:wr.max,label:lbl});
+  });
+
+  // 전속 / 공실 / 매각 (Y/N)
+  if(/비전속|전속\s*아/.test(raw)) push({kind:'bldExclusive',value:'N',id:'bldExclusive',label:'비전속'});
+  else if(/전속/.test(raw)) push({kind:'bldExclusive',value:'Y',id:'bldExclusive',label:'전속'});
+  if(/공실\s*없|공실\s*無/.test(raw)) push({kind:'bldVacancy',value:'N',id:'bldVacancy',label:'공실 없음'});
+  else if(/공실\s*(있|존재|많|보유)|공실\s*빌딩/.test(raw)) push({kind:'bldVacancy',value:'Y',id:'bldVacancy',label:'공실 있음'});
+  if(/매각\s*(희망|예정|가능|검토)/.test(raw)) push({kind:'bldForSale',value:'Y',id:'bldForSale',label:'매각 희망'});
+
+  // 주차 / 소유주 / 건물 주용도 — FILTER_DEFS 옵션 기반 (단일 진실원천)
+  FILTER_DEFS.filter(d => d.type==='multi' && d.key!=='floors').forEach(def => {
+    (def.options||[]).forEach(opt => { if(raw.includes(opt)) push({kind:'bldMulti',fkey:def.key,value:opt,id:'bld:'+def.key+':'+opt,label:def.label+' '+opt}); });
+  });
+
+  // 권역
+  CHAT_REGIONS.forEach(r => { if(r.kw.some(k => low.includes(k))) push({kind:'region',code:r.code,kw:r.kw,id:'region:'+r.code,label:r.name}); });
+
+  // 신축 (준공/리모델링 연도 조건이 별도로 잡힌 경우 중복 방지)
+  if(/(신축|재건축|새\s*건물)/.test(raw) && !conds.find(c => c.id==='fr:built' || c.id==='fr:renovated')) push({kind:'new',id:'new',label:'신축·리모델링'});
+  else if(/리모델/.test(raw) && !conds.find(c => c.id==='fr:renovated')) push({kind:'new',id:'new',label:'신축·리모델링'});
+
+  // 등급
+  let gm; const gre = /([a-fA-F])\s*(?:등급|급)|등급\s*([a-fA-F])/g;
+  while((gm = gre.exec(raw))){ const g=(gm[1]||gm[2]).toUpperCase(); push({kind:'grade',value:g,id:'grade:'+g,label:g+'등급'}); }
+
+  // 규모(기업/빌딩)
+  let w2 = raw;
+  [['중견기업','company','중견기업'],['중소기업','company','중소기업'],['대기업','company','대기업'],
+   ['초대형','building','초대형'],['중대형','building','중대형'],['대형','building','대형'],['중형','building','중형'],['소형','building','소형'],
+   ['중견','company','중견기업'],['중소','company','중소기업']].forEach(([tok,scope,val]) => {
+    if(w2.includes(tok)){ push({kind:'sizeClass',scope,value:val,id:'sizeClass:'+val,label:val}); w2=w2.split(tok).join(' '); }
+  });
+
+  // 진행/계약 상태
+  const rawNS = raw.replace(/\s/g,'');
+  ['협의중','제안완료','계약진행','검토중','제안서 발송','미팅 진행','투어 진행','LOI 제출','LOC 제출','계약서 검토','재계약','미계약','계약 완료','입주 예정','갱신 협의','입주 완료'].forEach(t => {
+    if(rawNS.includes(t.replace(/\s/g,''))) push({kind:'status',value:t,id:'status:'+t.replace(/\s/g,''),label:t});
+  });
+
+  // 담당자
+  const mgrNames = new Set(DEAL_SALES_OPTIONS);
+  DEALS.forEach(d => mgrNames.add(d.mgr)); CONTRACTS.forEach(c => mgrNames.add(c.mgr)); COMPANIES.forEach(c => mgrNames.add(c.담));
+  mgrNames.forEach(nm => { if(nm && nm!=='-' && raw.includes(nm)) push({kind:'manager',value:nm,id:'manager:'+nm,label:'담당 '+nm}); });
+
+  // 거래처/빌딩명 키워드 (이미 권역/상태 등으로 인식된 단어는 제외)
+  const regionKwSet = new Set(CHAT_REGIONS.flatMap(r => r.kw));
+  const cleanNames = [...COMPANIES.map(c=>c.n), ...BUILDINGS.map(b=>b.name), ...BUILDINGS.map(b=>b.alias||'')]
+    .map(n => n.replace(/\(.*?\)/g,'').replace(/\s/g,'')).filter(Boolean);
+  const words = raw.replace(/[0-9]/g,' ').split(/\s+/).filter(w => w.length>=2);
+  for(const w of words){
+    if(/(이상|이하|미만|초과|신축|리모델|권역|보여|찾아|검색|알려|목록|리스트|대기업|중견|중소|대형|중형|소형)/.test(w)) continue;
+    if(/(빌딩|건물|매물|오피스|사옥|거래처|고객|회사|클라이언트|파이프라인|임대차|콜드콜|담당|전속|공실|매각|주차|소유주|보증금|고정비|관리비|임대료|준공|리모델|연면적|전용률|엘리베이터|승강기|층수|높이)/.test(w)) continue;
+    if(regionKwSet.has(w.toLowerCase()) || [...regionKwSet].some(k => w.toLowerCase().includes(k))) continue;
+    if(cleanNames.some(nm => nm.includes(w))){ push({kind:'keyword',value:w,id:'keyword:'+w,label:'\u201C'+w+'\u201D'}); break; }
+  }
+
+  return { conds, target };
+}
+
+/* ── 적용된 조건 칩 (수정 가능) ── */
+function ChatChip({ cond, onRemove, tone='light' }){
+  const base = tone==='solid'
+    ? 'bg-white/20 text-white border-white/30'
+    : 'bg-indigo-50 text-indigo-700 border-indigo-200';
+  return (
+    <span className={`inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full text-[11px] font-semibold border ${base}`}>
+      {cond.label}
+      <button onClick={() => onRemove(cond.id)}
+        className={`flex items-center justify-center w-4 h-4 rounded-full transition ${tone==='solid' ? 'hover:bg-white/30' : 'hover:bg-indigo-200'}`}
+        title="조건 제거">
+        <X size={10} strokeWidth={2.5}/>
+      </button>
+    </span>
+  );
+}
+
+/* ── 목록 상단 AI 필터 바 ── */
+function ChatFilterBar({ conds, type, onRemove, onClear }){
+  if(!conds || !conds.length) return null;
+  const cnt = applyChatConds(chatGetDataset(type), conds, type).length;
+  return (
+    <div className="bg-indigo-50/70 border-b border-indigo-100 px-4 py-2 flex items-center gap-2 flex-wrap flex-shrink-0">
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 mr-0.5">
+        <Sparkles size={12}/> AI 필터
+      </span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {conds.map(c => <ChatChip key={c.id} cond={c} onRemove={onRemove}/>)}
+      </div>
+      <span className="text-[11px] text-indigo-500/80 ml-1">· 조건에 맞는 {CHAT_TYPE_LABEL[type]} <b className="text-indigo-700">{cnt}</b>건</span>
+      <button onClick={onClear} className="ml-auto text-[11px] font-semibold text-slate-500 hover:text-rose-600 flex items-center gap-1">
+        <RotateCcw size={11}/> 전체 해제
+      </button>
+    </div>
+  );
+}
+
+/* ── 플로팅 챗봇 위젯 ── */
+const CHAT_SUGGESTIONS = {
+  buildings: ['강남 200평 이상','2010년 이후 준공','전용률 55% 이상','NOC 25만원 이하','전속 빌딩'],
+  companies: ['A등급 거래처','강남 대기업','여의도 1,000평 이상','중견기업'],
+  deals:     ['강남 협의중 딜','A등급 딜','2,000평 이상 딜','검토중인 딜'],
+  contracts: ['강남 계약','갱신 협의','2,000평 이상 계약','입주 예정'],
+  none:      ['강남 200평 신축 빌딩','A등급 거래처','협의중인 딜','여의도 계약'],
+};
+
+/* 폼 입력 행 (모듈 레벨 — 매 렌더마다 재정의되면 포커스 유실되므로 밖으로 분리) */
+const FF_INPUT = "w-0 flex-1 min-w-0 px-1.5 py-1 text-[11px] border border-slate-200 rounded outline-none focus:border-indigo-400 tabular-nums";
+function FFRange({ label, minV, maxV, onMin, onMax, unit }){
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-[58px] text-[11px] text-slate-600 flex-shrink-0">{label}</span>
+      <input type="number" value={minV} onChange={e=>onMin(e.target.value)} placeholder="최소" className={FF_INPUT}/>
+      <span className="text-slate-300 text-[11px]">~</span>
+      <input type="number" value={maxV} onChange={e=>onMax(e.target.value)} placeholder="최대" className={FF_INPUT}/>
+      <span className="text-[10px] text-slate-400 w-7 flex-shrink-0">{unit}</span>
+    </div>
+  );
+}
+function FFSeg({ label, options, value, onSelect }){
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-[58px] text-[11px] text-slate-600 flex-shrink-0">{label}</span>
+      <div className="flex gap-1">
+        {options.map(o => (
+          <button key={o.v} onClick={()=>onSelect(value===o.v?null:o.v)}
+            className={`px-2.5 py-1 rounded text-[11px] border transition ${value===o.v?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`}>{o.t}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+function FFChips({ options, selected, onToggle }){
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map(o => (
+        <button key={o} onClick={()=>onToggle(o)}
+          className={`px-2 py-0.5 rounded-full text-[11px] border transition ${selected.includes(o)?'bg-indigo-100 text-indigo-700 border-indigo-300':'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`}>{o}</button>
+      ))}
+    </div>
+  );
+}
+function FFSec({ title, children }){
+  return (
+    <div className="px-3 py-2.5 border-b border-slate-100">
+      <div className="text-[10px] font-bold text-slate-400 mb-1.5">{title}</div>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+/* ── 챗봇 내장 구조적 필터 폼 — 컨트롤이 자연어와 동일한 chatConds를 생성 ── */
+function ChatFilterForm({ conds, onChange }){
+  const _PARK = (FILTER_DEFS.find(d=>d.key==='parking')||{}).options || [];
+  const _OWNER = (FILTER_DEFS.find(d=>d.key==='ownerType')||{}).options || [];
+  const _USE = (FILTER_DEFS.find(d=>d.key==='mainUse')||{}).options || [];
+  const AREA_PFX = { net:'전용 ', lease:'임대 ', vac:'공실 ', floorvac:'층공실 ', gross:'연면적 ' };
+  const numOrNull = (v) => { if(v===''||v==null) return null; const n=parseFloat(v); return isNaN(n)?null:n; };
+  const rangeText = (mn,mx,fmt) => (mn!=null&&mx!=null)?fmt(mn)+'~'+fmt(mx):(mx!=null?fmt(mx)+' 이하':fmt(mn)+' 이상');
+  const find = (id) => conds.find(c=>c.id===id);
+  const without = (ids) => conds.filter(c => !ids.includes(c.id));
+
+  // 단일 {min,max} cond (NOC/월고정비/보증금/준공/전용률)
+  const setRange = (id, kind, field, raw, { label, fmt, scale=1, extra={} }) => {
+    const cur = find(id) || { kind, id, min:null, max:null, ...extra };
+    const v = raw===''||raw==null ? null : Math.round(parseFloat(raw)*scale);
+    const next = { ...cur, ...extra, [field]: (v==null||isNaN(v))?null:v };
+    const rest = without([id]);
+    if(next.min==null && next.max==null){ onChange(rest); return; }
+    next.label = label+' '+rangeText(next.min, next.max, fmt);
+    onChange([...rest, next]);
+  };
+  // 면적 (areaMin/areaMax, metric 공유)
+  const areaMetric = (find('areaMin')||find('areaMax')||{}).metric || 'net';
+  const areaMin = (find('areaMin')||{}).value ?? '';
+  const areaMax = (find('areaMax')||{}).value ?? '';
+  const emitArea = (metric, mn, mx) => {
+    const pfx = AREA_PFX[metric];
+    const rest = without(['areaMin','areaMax']);
+    const out = [...rest];
+    if(mn!=null) out.push({kind:'areaMin',id:'areaMin',value:mn,metric,label:pfx+mn+'평 이상'});
+    if(mx!=null) out.push({kind:'areaMax',id:'areaMax',value:mx,metric,label:pfx+mx+'평 이하'});
+    onChange(out);
+  };
+  // Y/N 단일
+  const ynVal = (id) => (find(id)||{}).value || '';
+  const setYN = (id, kind, val, labelFn) => {
+    const rest = without([id]);
+    if(!val){ onChange(rest); return; }
+    onChange([...rest, { kind, id, value:val, label: labelFn(val) }]);
+  };
+  // 다중 (주차/소유주/주용도)
+  const multiSel = (fkey) => conds.filter(c=>c.kind==='bldMulti'&&c.fkey===fkey).map(c=>c.value);
+  const toggleMulti = (fkey, defLabel, opt) => {
+    const id='bld:'+fkey+':'+opt;
+    if(find(id)) onChange(without([id]));
+    else onChange([...conds, {kind:'bldMulti',fkey,value:opt,id,group:'bldMulti:'+fkey,label:defLabel+' '+opt}]);
+  };
+
+  const moneyMin = (id) => { const c=find(id); return c&&c.min!=null ? c.min/10000 : ''; };
+  const moneyMax = (id) => { const c=find(id); return c&&c.max!=null ? c.max/10000 : ''; };
+  const frMin = (id) => { const c=find(id); return c&&c.min!=null ? c.min : ''; };
+  const frMax = (id) => { const c=find(id); return c&&c.max!=null ? c.max : ''; };
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-white">
+      <FFSec title="면적">
+        <div className="flex items-center gap-1.5">
+          <span className="w-[58px] text-[11px] text-slate-600 flex-shrink-0">기준</span>
+          <select value={areaMetric} onChange={e=>emitArea(e.target.value, numOrNull(areaMin), numOrNull(areaMax))}
+            className="flex-1 px-1.5 py-1 text-[11px] border border-slate-200 rounded bg-white outline-none focus:border-indigo-400">
+            <option value="net">기준층 전용</option>
+            <option value="lease">기준층 임대</option>
+            <option value="vac">전체 공실 전용</option>
+            <option value="floorvac">층 공실 전용</option>
+            <option value="gross">연면적</option>
+          </select>
+        </div>
+        <FFRange label="평수" unit="평" minV={areaMin} maxV={areaMax}
+          onMin={v=>emitArea(areaMetric, numOrNull(v), numOrNull(areaMax))}
+          onMax={v=>emitArea(areaMetric, numOrNull(areaMin), numOrNull(v))}/>
+      </FFSec>
+
+      <FFSec title="비용 (원/평)">
+        <FFRange label="NOC" unit="만원" minV={moneyMin('noc')} maxV={moneyMax('noc')}
+          onMin={v=>setRange('noc','noc','min',v,{label:'NOC',fmt:wonLabel,scale:10000})}
+          onMax={v=>setRange('noc','noc','max',v,{label:'NOC',fmt:wonLabel,scale:10000})}/>
+        <FFRange label="월 고정비" unit="만원" minV={moneyMin('monthlyFee')} maxV={moneyMax('monthlyFee')}
+          onMin={v=>setRange('monthlyFee','monthlyFee','min',v,{label:'월 고정비',fmt:wonLabel,scale:10000})}
+          onMax={v=>setRange('monthlyFee','monthlyFee','max',v,{label:'월 고정비',fmt:wonLabel,scale:10000})}/>
+        <FFRange label="보증금" unit="만원" minV={moneyMin('deposit')} maxV={moneyMax('deposit')}
+          onMin={v=>setRange('deposit','deposit','min',v,{label:'보증금',fmt:wonLabel,scale:10000})}
+          onMax={v=>setRange('deposit','deposit','max',v,{label:'보증금',fmt:wonLabel,scale:10000})}/>
+      </FFSec>
+
+      <FFSec title="건물">
+        <FFRange label="준공년도" unit="년" minV={frMin('fr:built')} maxV={frMax('fr:built')}
+          onMin={v=>setRange('fr:built','fieldRange','min',v,{label:'준공',fmt:x=>x+'년',extra:{fkey:'built',group:'fr:built'}})}
+          onMax={v=>setRange('fr:built','fieldRange','max',v,{label:'준공',fmt:x=>x+'년',extra:{fkey:'built',group:'fr:built'}})}/>
+        <FFRange label="전용률" unit="%" minV={frMin('fr:occ')} maxV={frMax('fr:occ')}
+          onMin={v=>setRange('fr:occ','fieldRange','min',v,{label:'전용률',fmt:x=>x+'%',extra:{fkey:'occ',group:'fr:occ'}})}
+          onMax={v=>setRange('fr:occ','fieldRange','max',v,{label:'전용률',fmt:x=>x+'%',extra:{fkey:'occ',group:'fr:occ'}})}/>
+        <FFSeg label="전속" value={ynVal('bldExclusive')} onSelect={v=>setYN('bldExclusive','bldExclusive',v,x=>x==='Y'?'전속':'비전속')}
+          options={[{v:'Y',t:'전속'},{v:'N',t:'비전속'}]}/>
+        <FFSeg label="공실" value={ynVal('bldVacancy')} onSelect={v=>setYN('bldVacancy','bldVacancy',v,x=>x==='Y'?'공실 있음':'공실 없음')}
+          options={[{v:'Y',t:'있음'},{v:'N',t:'없음'}]}/>
+      </FFSec>
+
+      <FFSec title="주차"><FFChips options={_PARK} selected={multiSel('parking')} onToggle={o=>toggleMulti('parking','주차',o)}/></FFSec>
+      <FFSec title="소유주"><FFChips options={_OWNER} selected={multiSel('ownerType')} onToggle={o=>toggleMulti('ownerType','소유주',o)}/></FFSec>
+      <FFSec title="건물 주용도"><FFChips options={_USE} selected={multiSel('mainUse')} onToggle={o=>toggleMulti('mainUse','주용도',o)}/></FFSec>
+    </div>
+  );
+}
+
+function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds, open, setOpen, messages, setMessages, placement='bottomRight', lockType=null }){
+  const [input, setInput] = useState('');
+  const [filterMode, setFilterMode] = useState(false);
+  const bodyRef = useRef(null);
+  const curType = chatPageToType(pageView);
+  const sugKey = curType || 'none';
+  const dropDown = placement === 'topLeft'; // 위→아래로 펼침
+
+  useEffect(() => {
+    if(open && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [messages, open, conds]);
+
+  const run = (text) => {
+    const q = (text||'').trim();
+    if(!q) return;
+    const { conds: parsed, target } = parseChatQuery(q);
+    const msgs = [{ role:'user', text:q }];
+
+    if(parsed.length === 0){
+      msgs.push({ role:'bot', text:'음… 조건을 인식하지 못했어요. 지역·면적·등급·상태 등을 넣어보세요.\n예) “강남 300평 이상”, “B등급 딜”, “여의도 신축”' });
+      setMessages(m => [...m, ...msgs]); setInput(''); return;
+    }
+
+    // "추가/그리고/또한/~도" 등 → 기존 조건 유지하며 합치기(merge)
+    const isAdd = /(추가|그리고|또한|게다가|거기에|더해|함께|같이|에다|기존|유지|도\s*(추가|찾|보여|포함|넣))/.test(q) && conds.length > 0;
+
+    let finalConds, type, targetPage;
+    if(isAdd){
+      // 현재 목록 유지, 기존 조건에 새 조건을 병합 (같은 id는 최신값으로 갱신)
+      type = lockType || curType || 'buildings';
+      targetPage = null;
+      const merged = conds.map(c => ({ ...c }));
+      parsed.forEach(pc => { const i = merged.findIndex(x => x.id===pc.id); if(i>=0) merged[i]=pc; else merged.push(pc); });
+      finalConds = merged;
+    } else if(lockType){
+      // 특정 목록(빌딩)에 고정 — 다른 목록으로 이동하지 않음
+      type = lockType; targetPage = null; finalConds = parsed;
+    } else {
+      // 새 검색 (조건 교체)
+      if(target){ targetPage = target; type = chatPageToType(target); }
+      else if(curType){ type = curType; targetPage = null; }
+      else { type = 'buildings'; targetPage = 'allBuildings'; }
+      finalConds = parsed;
+    }
+
+    const cnt = applyChatConds(chatGetDataset(type), finalConds, type).length;
+    const tl = CHAT_TYPE_LABEL[type];
+    const newSummary = parsed.map(c => c.label).join(' · ');
+    const fullSummary = finalConds.map(c => c.label).join(' · ');
+    const areaCond = parsed.find(c => c.kind==='areaMin' || c.kind==='areaMax');
+    const basis = (type==='buildings' && areaCond)
+      ? ({ net:'기준층 전용', lease:'기준층 임대', vac:'전체 공실 전용', floorvac:'층 공실 전용' }[areaCond.metric||'net'])
+      : '';
+    const basisTxt = basis ? ` (면적은 ‘${basis}’ 기준)` : '';
+    let botText;
+    if(cnt === 0){
+      botText = `‘${fullSummary}’ 조건에 맞는 ${tl}이(가) 없어요. 칩의 ✕로 조건을 완화해 보세요.`;
+    } else if(isAdd){
+      botText = `기존 조건에 ‘${newSummary}’을(를) 더했어요.${basisTxt}\n→ ${fullSummary} 조건으로 총 ${cnt}건입니다.`;
+    } else {
+      botText = `${tl} 목록에서 ${fullSummary} 조건으로 ${cnt}건을 찾았어요.${basisTxt} 아래 칩에서 조건을 수정할 수 있어요.`;
+    }
+    msgs.push({ role:'bot', text:botText });
+
+    setMessages(m => [...m, ...msgs]);
+    setInput('');
+    onApply(finalConds, targetPage);
+  };
+
+  return (
+    <div className={dropDown ? 'absolute z-20 flex flex-col-reverse items-start' : 'fixed z-[60] flex flex-col items-end'}
+      style={dropDown ? { top:16, left:16 } : { right:24, bottom:24 }}>
+      {open && (
+        <div className={(dropDown ? 'mt-3' : 'mb-3') + ' w-[360px] max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden'}
+          style={{ height: dropDown ? 'min(520px, 70vh)' : 'min(560px, 78vh)' }}>
+          {/* 헤더 */}
+          <div className="px-4 py-3 flex items-center gap-2.5 text-white flex-shrink-0"
+            style={{ background:'linear-gradient(135deg,#4f46e5,#6366f1)' }}>
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center"><Sparkles size={16}/></div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-bold leading-tight">AI 검색 도우미</div>
+              <div className="text-[10px] text-indigo-100">현재 화면: {CHAT_TYPE_LABEL[curType] ? CHAT_TYPE_LABEL[curType]+' 목록' : '대시보드'}</div>
+            </div>
+            <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-white/20"><X size={16}/></button>
+          </div>
+
+          {/* 탭: 대화 / 필터 보기 */}
+          <div className="flex border-b border-slate-200 bg-white flex-shrink-0">
+            <button onClick={() => setFilterMode(false)}
+              className={`flex-1 py-2 text-[12px] font-semibold transition ${!filterMode?'text-indigo-600 border-b-2 border-indigo-600':'text-slate-400 hover:text-slate-600'}`}>💬 대화</button>
+            <button onClick={() => setFilterMode(true)}
+              className={`flex-1 py-2 text-[12px] font-semibold transition ${filterMode?'text-indigo-600 border-b-2 border-indigo-600':'text-slate-400 hover:text-slate-600'}`}>⚙ 필터 보기</button>
+          </div>
+
+          {filterMode ? (
+            <ChatFilterForm conds={conds} onChange={onSetConds} />
+          ) : (
+          <div ref={bodyRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-slate-50">
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role==='user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.role==='bot' && (
+                  <div className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-1.5 flex-shrink-0 mt-0.5"><Sparkles size={12}/></div>
+                )}
+                <div className={`px-3 py-2 rounded-2xl text-[12px] leading-relaxed whitespace-pre-line max-w-[78%] ${
+                  msg.role==='user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-700 rounded-bl-sm'}`}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+          </div>
+          )}
+
+          {/* 적용된 조건 칩 */}
+          {conds.length > 0 && (
+            <div className="px-3 py-2 border-t border-slate-100 bg-white flex-shrink-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-bold text-slate-400">적용된 조건 · 탭하여 수정</span>
+                <button onClick={onClear} className="text-[10px] font-semibold text-slate-400 hover:text-rose-600">전체 해제</button>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {conds.map(c => <ChatChip key={c.id} cond={c} onRemove={onRemove}/>)}
+              </div>
+            </div>
+          )}
+
+          {/* 추천 검색어 (대화 모드) */}
+          {!filterMode && (
+          <div className="px-3 pt-2 bg-white flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {CHAT_SUGGESTIONS[sugKey].map(s => (
+                <button key={s} onClick={() => run(s)}
+                  className="px-2.5 py-1 rounded-full text-[11px] bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-700 transition">{s}</button>
+              ))}
+            </div>
+          </div>
+          )}
+
+          {/* 입력창 */}
+          <div className="p-3 bg-white flex-shrink-0 flex items-center gap-2">
+            <input value={input} onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if(e.key==='Enter') run(input); }}
+              placeholder="예) 강남 200평 신축"
+              className="flex-1 px-3 py-2 text-[12px] bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-slate-400"/>
+            <button onClick={() => run(input)} disabled={!input.trim()}
+              className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 transition flex-shrink-0">
+              <Send size={15}/>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* FAB */}
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-center rounded-full shadow-xl text-white transition hover:scale-105 relative"
+        style={{ width:56, height:56, background:'linear-gradient(135deg,#4f46e5,#6366f1)' }}
+        title="AI 검색 도우미">
+        {open ? <X size={22}/> : <Sparkles size={22}/>}
+        {!open && conds.length > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">{conds.length}</span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
  * Main
  * ============================================================ */
 function GenstarMate() {
@@ -825,6 +1519,24 @@ function GenstarMate() {
   const [selectedContactId, setSelectedContactId] = useState(null);
   const [visitedIds, setVisitedIds]       = useState(new Set());
   const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
+  const [chatConds, setChatConds]         = useState([]); // 🤖 AI 챗봇이 적용한 자연어 필터 조건
+  const [chatOpen, setChatOpen]           = useState(false);
+  const [chatMessages, setChatMessages]   = useState([
+    { role:'bot', text:'안녕하세요! 찾으시는 조건을 자연어로 입력해 보세요.\n예) “강남 200평 신축”, “A등급 거래처”, “여의도 2000평 이상 계약”\n\n이미 적용된 조건에 더하려면 “추가로 …”, “그리고 …”라고 말씀하세요.' },
+  ]);
+
+  // 챗봇 조건 적용 핸들러
+  const applyChat = useCallback((conds, targetPage) => {
+    setChatConds(conds);
+    if(targetPage){
+      const base = (pv) => (pv||'').replace(/(All|My)$/, '').replace('allBuildings','buildings').replace('map','buildings').replace('detail','buildings');
+      if(base(targetPage) !== base(pageView)){ setPreviousView(targetPage); setPageView(targetPage); }
+    }
+  }, [pageView]);
+  const removeChatCond = useCallback((id) => setChatConds(prev => prev.filter(c => c.id !== id)), []);
+  const clearChatConds = useCallback(() => setChatConds([]), []);
+  const chatType = chatPageToType(pageView);
+  const CHAT_LIST_VIEWS = ['allBuildings','map'];
 
   const resetFilters = () => {
     setFilters(INITIAL_FILTERS);
@@ -834,7 +1546,7 @@ function GenstarMate() {
   };
 
   const visibleBuildings = useMemo(
-    () => BUILDINGS.filter(b => {
+    () => applyChatConds(BUILDINGS.filter(b => {
       // 권역
       if (!activeRegions.includes(b.region)) return false;
 
@@ -917,8 +1629,8 @@ function GenstarMate() {
       if (filters.mainUse.length > 0 && !filters.mainUse.includes(b.mainUse)) return false;
 
       return true;
-    }),
-    [activeRegions, filters]
+    }), chatConds, 'buildings'),
+    [activeRegions, filters, chatConds]
   );
 
   const selected = BUILDINGS.find(b => b.id === selectedId) || null;
@@ -967,6 +1679,9 @@ function GenstarMate() {
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)}
         currentPage={pageView} onNavigate={(p) => { setPreviousView(p); setPageView(p); }} />
       <div className="flex-1 flex flex-col min-w-0">
+        {chatType && CHAT_LIST_VIEWS.includes(pageView) && (
+          <ChatFilterBar conds={chatConds} type={chatType} onRemove={removeChatCond} onClear={clearChatConds} />
+        )}
         {(pageView === 'map' || pageView === 'allBuildings') && (
           <FilterBar filters={filters} setFilters={setFilters}
             openFilterKey={openFilterKey} setOpenFilterKey={setOpenFilterKey}
@@ -986,7 +1701,10 @@ function GenstarMate() {
                 onMarkerClick={handleSelectBuilding}
                 onViewBoundsChange={setInViewIds} />
               <MapLegend />
-              <MapStats count={inViewIds ? inViewIds.length : visibleBuildings.length} regionCount={activeRegions.length} />
+              <ChatAssistant pageView={pageView} conds={chatConds}
+                onApply={applyChat} onRemove={removeChatCond} onClear={clearChatConds} onSetConds={setChatConds}
+                open={chatOpen} setOpen={setChatOpen} messages={chatMessages} setMessages={setChatMessages}
+                placement="topLeft" lockType="buildings" />
             </div>
             {detailOpen && selected ? (
               <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
@@ -1016,7 +1734,7 @@ function GenstarMate() {
             onAddVacancy={addToCart}
             cart={cart} />
         ) : pageView === 'companiesAll' || pageView === 'companiesMy' ? (
-          <CompaniesPage onlyMy={pageView === 'companiesMy'}
+          <CompaniesPage onlyMy={pageView === 'companiesMy'} chatConds={chatConds}
             onOpenDetail={(id) => { setSelectedCompanyId(id); setPreviousView(pageView); setPageView('companyDetail'); }} />
         ) : pageView === 'companyDetail' ? (
           <CompanyDetailPage companyId={selectedCompanyId}
@@ -1033,14 +1751,14 @@ function GenstarMate() {
             onBack={() => setPageView(previousView)}
             onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('coldcallDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'dealsAll' || pageView === 'dealsMy' ? (
-          <DealsPage onlyMy={pageView === 'dealsMy'}
+          <DealsPage onlyMy={pageView === 'dealsMy'} chatConds={chatConds}
             onOpenDeal={(id) => { setSelectedDealId(id); setPreviousView(pageView); setPageView('dealDetail'); }}/>
         ) : pageView === 'dealDetail' ? (
           <DealDetailPage dealId={selectedDealId}
             onBack={() => setPageView(previousView)}
             onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('dealDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'contractsAll' || pageView === 'contractsMy' ? (
-          <ContractsPage onlyMy={pageView === 'contractsMy'}
+          <ContractsPage onlyMy={pageView === 'contractsMy'} chatConds={chatConds}
             onOpenContract={(id) => { setSelectedContractId(id); setPreviousView(pageView); setPageView('contractDetail'); }}/>
         ) : pageView === 'contractDetail' ? (
           <ContractDetailPage contractId={selectedContractId}
@@ -1072,6 +1790,8 @@ function GenstarMate() {
           onClose={() => setCompareOpen(false)}
           onRemove={removeFromCart} />
       )}
+
+      {/* 🤖 AI 챗봇 — 현재는 건물 지도에서만 노출 (추후 필요 시 다른 화면으로 확장) */}
     </div>
   );
 }
@@ -1244,6 +1964,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
         </div>
       </div>
 
+      {pageView !== 'map' && (
       <div className="px-5 py-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100">
         <span className="text-[11px] font-bold text-slate-600 mr-1 flex-shrink-0">필터</span>
         {FILTER_DEFS.map(def => {
@@ -1331,6 +2052,7 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
           );
         })}
       </div>
+      )}
     </header>
   );
 }
@@ -1452,7 +2174,7 @@ function KakaoMap({ buildings, selectedId, visitedIds, onMarkerClick, onViewBoun
       div.className = 'gm-marker';
       div.style.cursor = 'pointer';
       div.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;transform:translate(0,-100%);">
+        <div style="display:flex;flex-direction:column;align-items:center;">
           <div style="background:${labelBg};color:white;padding:1.5px 5px;border-radius:3px;font-size:9.5px;font-weight:700;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.25);margin-bottom:1px;letter-spacing:-0.01em;${isSelected ? 'transform:scale(1.15);outline:1.5px solid white;outline-offset:1.5px;' : ''}${isVisited ? 'opacity:0.85;' : ''}">
             ${b.name}${isVisited ? ' <span style="opacity:0.65;font-size:8px;margin-left:1px;">✓</span>' : ''}
           </div>
@@ -3134,7 +3856,7 @@ const GRADE_STYLES = {
 /* ============================================================
  * CompaniesPage - 거래처 리스트 페이지
  * ============================================================ */
-function CompaniesPage({ onlyMy, onOpenDetail }) {
+function CompaniesPage({ onlyMy, chatConds = [], onOpenDetail }) {
   const [sort, setSort] = useState('expiry');
   const [coldcallSet, setColdcallSet] = useState(new Set());
   const [starred, setStarred] = useState(new Set());
@@ -3258,8 +3980,9 @@ function CompaniesPage({ onlyMy, onOpenDetail }) {
           return av.localeCompare(bv);
       }
     });
+    arr = applyChatConds(arr, chatConds, 'companies');
     return arr;
-  }, [onlyMy, sort, filters]);
+  }, [onlyMy, sort, filters, chatConds]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
@@ -4321,7 +5044,7 @@ const DEAL_MOVE_LIKELIHOOD = ['확정','상','중','하','미정'];
 const DEAL_PROGRESS_STAGES = ['제안서 발송','미팅 진행','투어 진행','LOI 제출','LOC 제출','계약서 검토 중','계약 진행','재계약','미계약'];
 const DEAL_SALES_OPTIONS = ['장한덕','송승원','박환웅','주정호','박인하','임정수','최필규','정혜정','김민희','구민모','박현철'];
 
-function DealsPage({ onlyMy, onOpenDeal }) {
+function DealsPage({ onlyMy, chatConds = [], onOpenDeal }) {
   const [sort, setSort] = useState('contractDate');
   const [perPage, setPerPage] = useState(15);
   const [page, setPage] = useState(1);
@@ -4388,8 +5111,8 @@ function DealsPage({ onlyMy, onOpenDeal }) {
         default: return a.ec.localeCompare(b.ec);
       }
     });
-    return arr;
-  }, [onlyMy, sort, filters]);
+    return applyChatConds(arr, chatConds, 'deals');
+  }, [onlyMy, sort, filters, chatConds]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
   useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
@@ -4747,7 +5470,7 @@ function ContractTypePill({ type }) {
   return <span style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:500,background:bg,color:c}}>{type}</span>;
 }
 
-function ContractsPage({ onlyMy, onOpenContract }) {
+function ContractsPage({ onlyMy, chatConds = [], onOpenContract }) {
   const [sort, setSort] = useState('endDate');
   const [perPage, setPerPage] = useState(15);
   const [page, setPage] = useState(1);
@@ -4810,8 +5533,8 @@ function ContractsPage({ onlyMy, onOpenContract }) {
         default: return a.end.localeCompare(b.end);
       }
     });
-    return arr;
-  }, [onlyMy, sort, filters]);
+    return applyChatConds(arr, chatConds, 'contracts');
+  }, [onlyMy, sort, filters, chatConds]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
   useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
