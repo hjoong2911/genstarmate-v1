@@ -782,7 +782,7 @@ const cartHelpers = {
     floor: vacancy.floor,
     area: vacancy.area,
     net: vacancy.net,
-    noc: vacancy.noc,
+    noc: computeNoc(vacancy),
     when: vacancy.when,
     addedAt: Date.now(),
   }),
@@ -799,8 +799,31 @@ const formatFloors = (b) => `B${b.belowFloors}/${b.aboveFloors}F`;
 const formatBuilt  = (b) => b.renovated ? `${b.built} / ${b.renovated}` : `${b.built}`;
 const sumVacancyArea = (b) => b.vacancies.reduce((s, v) => s + v.area, 0);
 const sumVacancyNet  = (b) => b.vacancies.reduce((s, v) => s + v.net, 0);
+// NOC 자동 계산: [(평당임대료 + 평당관리비) × 임대면적] / 전용면적, 소수점 절삭
+const computeNoc = (v) => {
+  if (!v || !v.net || v.net <= 0) return 0;
+  return Math.floor(((v.rentPerPy || 0) + (v.mgmtPerPy || 0)) * v.area / v.net);
+};
 const avgVacancyNoc  = (b) => b.vacancies.length > 0
-  ? Math.round(b.vacancies.reduce((s, v) => s + v.noc, 0) / b.vacancies.length) : 0;
+  ? Math.round(b.vacancies.reduce((s, v) => s + computeNoc(v), 0) / b.vacancies.length) : 0;
+// 주차 방식 분류 (표시용): 자주식/기계식 대수 기준 (둘 다 있으면 혼용)
+const parkingType = (b) => {
+  const pd = b.parkingDetail || {};
+  const self = pd.self || 0, mech = pd.mechanical || 0;
+  if (self > 0 && mech > 0) return '혼용';
+  if (mech > 0) return '기계식';
+  if (self > 0) return '자주식';
+  return b.parking || '-';
+};
+// 주차 필터 매칭 (필터용): 기계식 대수가 있으면 기계식+혼용 모두 매칭, 자주식도 동일
+const parkingMatches = (b, filterValue) => {
+  const pd = b.parkingDetail || {};
+  const self = pd.self || 0, mech = pd.mechanical || 0;
+  if (filterValue === '자주식') return self > 0;
+  if (filterValue === '기계식') return mech > 0;
+  if (filterValue === '혼용')   return self > 0 && mech > 0;
+  return false;
+};
 
 /* ============================================================
  * 🤖 AI 챗봇 검색 (데모용 자연어 인식 — Claude API 미사용)
@@ -1228,7 +1251,7 @@ function FFSec({ title, children }){
 }
 
 /* ── 챗봇 내장 구조적 필터 폼 — 컨트롤이 자연어와 동일한 chatConds를 생성 ── */
-function ChatFilterForm({ conds, onChange }){
+function ChatFilterForm({ conds, onChange, horizontal=false }){
   const _PARK = (FILTER_DEFS.find(d=>d.key==='parking')||{}).options || [];
   const _OWNER = (FILTER_DEFS.find(d=>d.key==='ownerType')||{}).options || [];
   const _USE = (FILTER_DEFS.find(d=>d.key==='mainUse')||{}).options || [];
@@ -1279,6 +1302,73 @@ function ChatFilterForm({ conds, onChange }){
   const moneyMax = (id) => { const c=find(id); return c&&c.max!=null ? c.max/10000 : ''; };
   const frMin = (id) => { const c=find(id); return c&&c.min!=null ? c.min : ''; };
   const frMax = (id) => { const c=find(id); return c&&c.max!=null ? c.max : ''; };
+
+  // ── 가로형(화면 상단, 최대 2줄) ──
+  if(horizontal){
+    const GRP = "flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1";
+    const LB = "text-[11px] font-semibold text-slate-500 flex-shrink-0";
+    const NUM = "w-12 px-1 py-0.5 text-[11px] border border-slate-200 rounded outline-none focus:border-indigo-400 tabular-nums";
+    const segBtn = (on) => `px-1.5 py-0.5 rounded text-[11px] border transition ${on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'}`;
+    const chipBtn = (on) => `px-1.5 py-0.5 rounded-full text-[11px] border transition ${on?'bg-indigo-100 text-indigo-700 border-indigo-300':'bg-white text-slate-500 border-slate-200 hover:border-indigo-300'}`;
+    return (
+      <div className="flex flex-wrap gap-2 items-start" style={{ maxHeight:94, overflowY:'auto' }}>
+        <div className={GRP}>
+          <span className={LB}>면적</span>
+          <select value={areaMetric} onChange={e=>emitArea(e.target.value, numOrNull(areaMin), numOrNull(areaMax))}
+            className="px-1 py-0.5 text-[11px] border border-slate-200 rounded bg-white outline-none">
+            <option value="net">기준층전용</option><option value="lease">기준층임대</option><option value="vac">전체공실</option><option value="floorvac">층공실</option><option value="gross">연면적</option>
+          </select>
+          <input type="number" value={areaMin} onChange={e=>emitArea(areaMetric, numOrNull(e.target.value), numOrNull(areaMax))} placeholder="최소" className={NUM}/>
+          <span className="text-slate-300 text-[10px]">~</span>
+          <input type="number" value={areaMax} onChange={e=>emitArea(areaMetric, numOrNull(areaMin), numOrNull(e.target.value))} placeholder="최대" className={NUM}/>
+          <span className="text-[10px] text-slate-400">평</span>
+        </div>
+        {[['noc','NOC'],['monthlyFee','월고정비'],['deposit','보증금']].map(([k,lb]) => (
+          <div key={k} className={GRP}>
+            <span className={LB}>{lb}</span>
+            <input type="number" value={moneyMin(k)} onChange={e=>setRange(k,k,'min',e.target.value,{label:lb,fmt:wonLabel,scale:10000})} placeholder="최소" className={NUM}/>
+            <span className="text-slate-300 text-[10px]">~</span>
+            <input type="number" value={moneyMax(k)} onChange={e=>setRange(k,k,'max',e.target.value,{label:lb,fmt:wonLabel,scale:10000})} placeholder="최대" className={NUM}/>
+            <span className="text-[10px] text-slate-400">만원</span>
+          </div>
+        ))}
+        <div className={GRP}>
+          <span className={LB}>준공</span>
+          <input type="number" value={frMin('fr:built')} onChange={e=>setRange('fr:built','fieldRange','min',e.target.value,{label:'준공',fmt:x=>x+'년',extra:{fkey:'built',group:'fr:built'}})} placeholder="최소" className={NUM}/>
+          <span className="text-slate-300 text-[10px]">~</span>
+          <input type="number" value={frMax('fr:built')} onChange={e=>setRange('fr:built','fieldRange','max',e.target.value,{label:'준공',fmt:x=>x+'년',extra:{fkey:'built',group:'fr:built'}})} placeholder="최대" className={NUM}/>
+          <span className="text-[10px] text-slate-400">년</span>
+        </div>
+        <div className={GRP}>
+          <span className={LB}>전용률</span>
+          <input type="number" value={frMin('fr:occ')} onChange={e=>setRange('fr:occ','fieldRange','min',e.target.value,{label:'전용률',fmt:x=>x+'%',extra:{fkey:'occ',group:'fr:occ'}})} placeholder="최소" className={NUM}/>
+          <span className="text-slate-300 text-[10px]">~</span>
+          <input type="number" value={frMax('fr:occ')} onChange={e=>setRange('fr:occ','fieldRange','max',e.target.value,{label:'전용률',fmt:x=>x+'%',extra:{fkey:'occ',group:'fr:occ'}})} placeholder="최대" className={NUM}/>
+          <span className="text-[10px] text-slate-400">%</span>
+        </div>
+        <div className={GRP}>
+          <span className={LB}>전속</span>
+          {[{v:'Y',t:'전속'},{v:'N',t:'비전속'}].map(o => (
+            <button key={o.v} onClick={()=>setYN('bldExclusive','bldExclusive',ynVal('bldExclusive')===o.v?null:o.v,x=>x==='Y'?'전속':'비전속')} className={segBtn(ynVal('bldExclusive')===o.v)}>{o.t}</button>
+          ))}
+        </div>
+        <div className={GRP}>
+          <span className={LB}>공실</span>
+          {[{v:'Y',t:'있음'},{v:'N',t:'없음'}].map(o => (
+            <button key={o.v} onClick={()=>setYN('bldVacancy','bldVacancy',ynVal('bldVacancy')===o.v?null:o.v,x=>x==='Y'?'공실 있음':'공실 없음')} className={segBtn(ynVal('bldVacancy')===o.v)}>{o.t}</button>
+          ))}
+        </div>
+        {[['parking','주차',_PARK],['ownerType','소유주',_OWNER],['mainUse','주용도',_USE]].map(([fk,lb,opts]) => (
+          <div key={fk} className={GRP}>
+            <span className={LB}>{lb}</span>
+            {opts.map(o => (
+              <button key={o} onClick={()=>toggleMulti(fk,lb,o)} className={chipBtn(multiSel(fk).includes(o))}>{o}</button>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-white">
@@ -1331,9 +1421,8 @@ function ChatFilterForm({ conds, onChange }){
   );
 }
 
-function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds, open, setOpen, messages, setMessages, placement='bottomRight', lockType=null }){
+function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds, open, setOpen, messages, setMessages, placement='bottomRight', lockType=null, filterMode=false, setFilterMode }){
   const [input, setInput] = useState('');
-  const [filterMode, setFilterMode] = useState(false);
   const bodyRef = useRef(null);
   const curType = chatPageToType(pageView);
   const sugKey = curType || 'none';
@@ -1404,8 +1493,8 @@ function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds
     <div className={dropDown ? 'absolute z-20 flex flex-col-reverse items-start' : 'fixed z-[60] flex flex-col items-end'}
       style={dropDown ? { top:16, left:16 } : { right:24, bottom:24 }}>
       {open && (
-        <div className={(dropDown ? 'mt-3' : 'mb-3') + ' w-[360px] max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden'}
-          style={{ height: dropDown ? 'min(520px, 70vh)' : 'min(560px, 78vh)' }}>
+        <div className={(dropDown ? 'mt-2' : 'mb-3') + ' w-[320px] max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden'}
+          style={{ height: dropDown ? 'min(460px, 62vh)' : 'min(520px, 74vh)' }}>
           {/* 헤더 */}
           <div className="px-4 py-3 flex items-center gap-2.5 text-white flex-shrink-0"
             style={{ background:'linear-gradient(135deg,#4f46e5,#6366f1)' }}>
@@ -1417,17 +1506,7 @@ function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds
             <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-white/20"><X size={16}/></button>
           </div>
 
-          {/* 탭: 대화 / 필터 보기 */}
-          <div className="flex border-b border-slate-200 bg-white flex-shrink-0">
-            <button onClick={() => setFilterMode(false)}
-              className={`flex-1 py-2 text-[12px] font-semibold transition ${!filterMode?'text-indigo-600 border-b-2 border-indigo-600':'text-slate-400 hover:text-slate-600'}`}>💬 대화</button>
-            <button onClick={() => setFilterMode(true)}
-              className={`flex-1 py-2 text-[12px] font-semibold transition ${filterMode?'text-indigo-600 border-b-2 border-indigo-600':'text-slate-400 hover:text-slate-600'}`}>⚙ 필터 보기</button>
-          </div>
-
-          {filterMode ? (
-            <ChatFilterForm conds={conds} onChange={onSetConds} />
-          ) : (
+          {/* 대화 영역 (자연어 검색 전용) */}
           <div ref={bodyRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-slate-50">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role==='user' ? 'justify-end' : 'justify-start'}`}>
@@ -1441,7 +1520,6 @@ function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds
               </div>
             ))}
           </div>
-          )}
 
           {/* 적용된 조건 칩 */}
           {conds.length > 0 && (
@@ -1454,18 +1532,6 @@ function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds
                 {conds.map(c => <ChatChip key={c.id} cond={c} onRemove={onRemove}/>)}
               </div>
             </div>
-          )}
-
-          {/* 추천 검색어 (대화 모드) */}
-          {!filterMode && (
-          <div className="px-3 pt-2 bg-white flex-shrink-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {CHAT_SUGGESTIONS[sugKey].map(s => (
-                <button key={s} onClick={() => run(s)}
-                  className="px-2.5 py-1 rounded-full text-[11px] bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-700 transition">{s}</button>
-              ))}
-            </div>
-          </div>
           )}
 
           {/* 입력창 */}
@@ -1487,7 +1553,7 @@ function ChatAssistant({ pageView, conds, onApply, onRemove, onClear, onSetConds
         className="flex items-center justify-center rounded-full shadow-xl text-white transition hover:scale-105 relative"
         style={{ width:56, height:56, background:'linear-gradient(135deg,#4f46e5,#6366f1)' }}
         title="AI 검색 도우미">
-        {open ? <X size={22}/> : <Sparkles size={22}/>}
+        {open ? <Sparkles size={22}/> : <Sparkles size={22}/>}
         {!open && conds.length > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">{conds.length}</span>
         )}
@@ -1521,6 +1587,7 @@ function GenstarMate() {
   const [inViewIds, setInViewIds]         = useState(null); // null = not initialized, Array = ids visible on map
   const [chatConds, setChatConds]         = useState([]); // 🤖 AI 챗봇이 적용한 자연어 필터 조건
   const [chatOpen, setChatOpen]           = useState(false);
+  const [chatFilterMode, setChatFilterMode] = useState(false);
   const [chatMessages, setChatMessages]   = useState([
     { role:'bot', text:'안녕하세요! 찾으시는 조건을 자연어로 입력해 보세요.\n예) “강남 200평 신축”, “A등급 거래처”, “여의도 2000평 이상 계약”\n\n이미 적용된 조건에 더하려면 “추가로 …”, “그리고 …”라고 말씀하세요.' },
   ]);
@@ -1615,8 +1682,8 @@ function GenstarMate() {
         if (!_vac.includes(v)) return false;
       }
 
-      // 주차
-      if (filters.parking.length > 0 && !filters.parking.includes(b.parking)) return false;
+      // 주차 (대수 기준: 기계식 대수>0이면 기계식+혼용 매칭, 자주식 대수>0이면 자주식 매칭)
+      if (filters.parking.length > 0 && !filters.parking.some(f => parkingMatches(b, f))) return false;
 
       // 소유주 유형
       if (filters.ownerType.length > 0 && !filters.ownerType.includes(b.ownerType)) return false;
@@ -1663,6 +1730,25 @@ function GenstarMate() {
   const removeFromCart = useCallback((id) => setCart(prev => prev.filter(i => i.id !== id)), []);
   const clearCart      = useCallback(() => setCart([]), []);
 
+  // 개별 담기/해제 토글
+  const toggleVacancy = useCallback((building, vacancy) => {
+    const item = cartHelpers.buildCartItem(building, vacancy);
+    setCart(prev => prev.find(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [...prev, item]);
+  }, []);
+  // 건물 전체 공실 담기/해제 토글: 하나라도 안 담겼으면 전부 담기, 전부 담겼으면 전부 해제
+  const toggleAllVacancies = useCallback((building) => {
+    setCart(prev => {
+      const items = building.vacancies.map(v => cartHelpers.buildCartItem(building, v));
+      const allIn = items.length > 0 && items.every(it => prev.find(e => e.id === it.id));
+      if (allIn) {
+        const ids = new Set(items.map(it => it.id));
+        return prev.filter(e => !ids.has(e.id));
+      }
+      const toAdd = items.filter(it => !prev.find(e => e.id === it.id));
+      return [...prev, ...toAdd];
+    });
+  }, []);
+
   const handleSelectBuilding = useCallback((id) => {
     setSelectedId(id);
     setPhotoIdx(0);
@@ -1700,15 +1786,16 @@ function GenstarMate() {
                 visitedIds={visitedIds}
                 onMarkerClick={handleSelectBuilding}
                 onViewBoundsChange={setInViewIds} />
-              <MapLegend />
               <ChatAssistant pageView={pageView} conds={chatConds}
                 onApply={applyChat} onRemove={removeChatCond} onClear={clearChatConds} onSetConds={setChatConds}
                 open={chatOpen} setOpen={setChatOpen} messages={chatMessages} setMessages={setChatMessages}
+                filterMode={chatFilterMode} setFilterMode={setChatFilterMode}
                 placement="topLeft" lockType="buildings" />
             </div>
             {detailOpen && selected ? (
               <DetailCard building={selected} photoIdx={photoIdx} setPhotoIdx={setPhotoIdx}
-                onAddVacancy={addToCart} onAddAllVacancies={addAllVacancies} cart={cart}
+                onAddVacancy={addToCart} onAddAllVacancies={toggleAllVacancies} cart={cart}
+                onToggleVacancy={toggleVacancy}
                 onCollapse={() => setDetailOpen(false)}
                 onOpenDetail={() => { setPreviousView('map'); setPageView('detail'); }} />
             ) : selected ? (
@@ -1726,15 +1813,17 @@ function GenstarMate() {
           <BuildingDetailPage building={selected}
             onBack={() => setPageView(previousView)}
             onAddVacancy={addToCart}
-            onAddAllVacancies={addAllVacancies}
+            onAddAllVacancies={toggleAllVacancies}
+            onToggleVacancy={toggleVacancy}
             cart={cart} />
         ) : pageView === 'allBuildings' ? (
           <AllBuildingsPage buildings={visibleBuildings} filters={filters}
             onOpenDetail={(id) => { setSelectedId(id); setPreviousView('allBuildings'); setPageView('detail'); }}
             onAddVacancy={addToCart}
+            onAddAllVacancies={toggleAllVacancies}
             cart={cart} />
         ) : pageView === 'companiesAll' || pageView === 'companiesMy' ? (
-          <CompaniesPage onlyMy={pageView === 'companiesMy'} chatConds={chatConds}
+          <CompaniesPage onlyMy={pageView === 'companiesMy'}
             onOpenDetail={(id) => { setSelectedCompanyId(id); setPreviousView(pageView); setPageView('companyDetail'); }} />
         ) : pageView === 'companyDetail' ? (
           <CompanyDetailPage companyId={selectedCompanyId}
@@ -1751,14 +1840,14 @@ function GenstarMate() {
             onBack={() => setPageView(previousView)}
             onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('coldcallDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'dealsAll' || pageView === 'dealsMy' ? (
-          <DealsPage onlyMy={pageView === 'dealsMy'} chatConds={chatConds}
+          <DealsPage onlyMy={pageView === 'dealsMy'}
             onOpenDeal={(id) => { setSelectedDealId(id); setPreviousView(pageView); setPageView('dealDetail'); }}/>
         ) : pageView === 'dealDetail' ? (
           <DealDetailPage dealId={selectedDealId}
             onBack={() => setPageView(previousView)}
             onOpenCompany={(id) => { setSelectedCompanyId(id); setPreviousView('dealDetail'); setPageView('companyDetail'); }} />
         ) : pageView === 'contractsAll' || pageView === 'contractsMy' ? (
-          <ContractsPage onlyMy={pageView === 'contractsMy'} chatConds={chatConds}
+          <ContractsPage onlyMy={pageView === 'contractsMy'}
             onOpenContract={(id) => { setSelectedContractId(id); setPreviousView(pageView); setPageView('contractDetail'); }}/>
         ) : pageView === 'contractDetail' ? (
           <ContractDetailPage contractId={selectedContractId}
@@ -1790,8 +1879,6 @@ function GenstarMate() {
           onClose={() => setCompareOpen(false)}
           onRemove={removeFromCart} />
       )}
-
-      {/* 🤖 AI 챗봇 — 현재는 건물 지도에서만 노출 (추후 필요 시 다른 화면으로 확장) */}
     </div>
   );
 }
@@ -1964,10 +2051,9 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
         </div>
       </div>
 
-      {pageView !== 'map' && (
       <div className="px-5 py-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100">
         <span className="text-[11px] font-bold text-slate-600 mr-1 flex-shrink-0">필터</span>
-        {FILTER_DEFS.map(def => {
+        {FILTER_DEFS.filter(def => pageView === 'map' ? !['ownerType','forSale','mainUse'].includes(def.key) : true).map(def => {
           const isOpen = openFilterKey === def.key;
           const hasValue = hasFilterValue(def.key);
           const val = filters[def.key];
@@ -2052,7 +2138,6 @@ function FilterBar({ filters, setFilters, openFilterKey, setOpenFilterKey, hasFi
           );
         })}
       </div>
-      )}
     </header>
   );
 }
@@ -2268,7 +2353,7 @@ function MapStats({ count, regionCount }) {
 /* ============================================================
  * DetailCard
  * ============================================================ */
-function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVacancies, cart, onCollapse, onOpenDetail }) {
+function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVacancies, onToggleVacancy, cart, onCollapse, onOpenDetail }) {
   const color = REGION_COLORS[building.region];
   const photoSlots = ['외관 사진', '내부 사진 1', '내부 사진 2', '내부 사진 3'];
 
@@ -2277,6 +2362,7 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
   const avgNoc    = avgVacancyNoc(building);
 
   const isInCart = (v) => cart.some(item => item.id === `${building.id}-${v.floor}`);
+  const allInCart = building.vacancies.length > 0 && building.vacancies.every(isInCart);
 
   return (
     <section className="w-[280px] bg-white border-l border-slate-200 flex flex-col flex-shrink-0 overflow-hidden">
@@ -2337,7 +2423,7 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
           <KV label="기준층 전용(평)" value={building.baseNet} />
         </div>
         <div className="grid grid-cols-2 border-b border-slate-100">
-          <KV label="주차" value={building.parking} border />
+          <KV label="주차" value={parkingType(building)} border />
           <KV label="" value="" />
         </div>
 
@@ -2363,12 +2449,12 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
                       <td className="px-1.5 py-1.5 font-bold text-slate-800">{v.floor}</td>
                       <td className="text-right px-1 py-1.5 text-slate-700 font-medium">{v.area}</td>
                       <td className="text-right px-1 py-1.5 text-slate-500">{v.net}</td>
-                      <td className="text-right px-1 py-1.5 text-slate-700 font-medium">{v.noc > 0 ? v.noc.toLocaleString() : '-'}</td>
+                      <td className="text-right px-1 py-1.5 text-slate-700 font-medium">{computeNoc(v) > 0 ? computeNoc(v).toLocaleString() : '-'}</td>
                       <td className="px-1.5 py-1.5 text-slate-600 truncate">{v.when}</td>
                       <td className="text-right px-1.5 py-1.5">
-                        <button onClick={() => onAddVacancy(building, v)} disabled={inCart}
-                          className={`text-[9px] font-bold whitespace-nowrap ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
-                          {inCart ? '담김' : '+ 담기'}
+                        <button onClick={() => onToggleVacancy(building, v)}
+                          className={`text-[9px] font-bold whitespace-nowrap ${inCart ? 'text-rose-500 hover:text-rose-700' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                          {inCart ? '✓ 담김' : '+ 담기'}
                         </button>
                       </td>
                     </tr>
@@ -2384,8 +2470,8 @@ function DetailCard({ building, photoIdx, setPhotoIdx, onAddVacancy, onAddAllVac
                   <td colSpan="2" className="text-right px-1.5 py-1.5">
                     <button onClick={() => onAddAllVacancies(building)}
                       className="px-2 py-0.5 text-[9px] font-bold text-white rounded transition hover:opacity-90 whitespace-nowrap"
-                      style={{ backgroundColor: color.bg }}>
-                      전체 담기
+                      style={{ backgroundColor: allInCart ? '#64748b' : color.bg }}>
+                      {allInCart ? '전체 해제' : '전체 담기'}
                     </button>
                   </td>
                 </tr>
@@ -2658,7 +2744,7 @@ function CompareView({ cart, buildings, onClose, onRemove }) {
     rows.push(['',         '기준층 임대면적 (평)', ...cols.map(c => c.b.baseLease)]);
     rows.push(['',         '기준층 전용면적 (평)', ...cols.map(c => c.b.baseNet)]);
     rows.push(['', '', ...blank]);
-    rows.push(['주차', '주차 방식',         ...cols.map(c => c.b.parking)]);
+    rows.push(['주차', '주차 방식',         ...cols.map(c => parkingType(c.b))]);
     rows.push(['',     '총 주차 대수',      ...cols.map(c => Math.round(c.b.area * 0.012) + '대')]);
     rows.push(['',     '무료 주차 비율',    ...cols.map(_ => '1대/70평')]);
     rows.push(['', '', ...blank]);
@@ -2775,7 +2861,7 @@ function CompareView({ cart, buildings, onClose, onRemove }) {
               ]} />
 
               <CompareSection title="주차" rows={[
-                ['주차 방식',      cols.map(c => c.b.parking)],
+                ['주차 방식',      cols.map(c => parkingType(c.b))],
                 ['총 주차 대수',   cols.map(c => Math.round(c.b.area * 0.012) + '대')],
                 ['무료 주차 비율', cols.map(_ => '1대/70평')],
               ]} />
@@ -2879,7 +2965,7 @@ function EditCell({ value, onChange, type='text' }) {
 /* ============================================================
  * BuildingDetailPage - 빌딩 상세 페이지 (사진 + 정보 + 메모 + 공실)
  * ============================================================ */
-function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies, cart }) {
+function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies, onToggleVacancy, cart }) {
   if (!building) return null;
   const color = REGION_COLORS[building.region];
   const [memoInput, setMemoInput] = useState('');
@@ -3009,7 +3095,7 @@ function BuildingDetailPage({ building, onBack, onAddVacancy, onAddAllVacancies,
         <BaseStandardTable building={building} />
 
         {/* 개별공실 정보 — 빠른 가독성을 위해 평단가 바로 아래 */}
-        <VacancyDetailTable building={building} onAddVacancy={onAddVacancy} onAddAllVacancies={onAddAllVacancies} cart={cart} />
+        <VacancyDetailTable building={building} onAddVacancy={onAddVacancy} onAddAllVacancies={onAddAllVacancies} onToggleVacancy={onToggleVacancy} cart={cart} />
 
         {/* 입주사 / 도면 / 당사 계약 / 시장 계약 사례 — 4개 가로 접이식 */}
         <CollapsibleRow building={building} />
@@ -3148,7 +3234,16 @@ function BasicInfoForm({ building: b, editMode }) {
                 className="w-16 px-1.5 py-0.5 text-[11px] bg-amber-50 border border-amber-300 rounded outline-none focus:border-amber-500"/>
               대
             </span>
-          ) : `기계식 ${parkMech || 0} 대 / 자주식 ${parkSelf || 0} 대`}
+          ) : (
+            <span className="flex items-center gap-2">
+              <span>{`기계식 ${parkMech || 0} 대 / 자주식 ${parkSelf || 0} 대`}</span>
+              {(() => {
+                const self = Number(parkSelf) || 0, mech = Number(parkMech) || 0;
+                const t = (self > 0 && mech > 0) ? '혼용' : mech > 0 ? '기계식' : self > 0 ? '자주식' : null;
+                return t ? <span className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded">{t}</span> : null;
+              })()}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -3581,18 +3676,18 @@ function BaseStandardTable({ building: b }) {
 }
 
 /* ----- 개별공실 정보 ----- */
-function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart }) {
+function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, onToggleVacancy, cart }) {
   const isInCart = (v) => cart.some(item => item.id === `${b.id}-${v.floor}`);
+  const allInCart = b.vacancies.length > 0 && b.vacancies.every(isInCart);
   const cell = (v, suffix='') => v != null && v !== '' ? v.toLocaleString() + suffix : '';
   return (
     <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
         <span className="text-[13px] font-bold text-slate-800">개별공실 정보 <span className="text-[11px] text-slate-400 ml-1">({b.vacancies.length}건)</span></span>
         <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded text-slate-700 hover:bg-slate-50">지우기</button>
           <button onClick={() => onAddAllVacancies(b)} disabled={b.vacancies.length === 0}
             className="px-2.5 py-1 text-[10px] font-bold rounded text-white"
-            style={{backgroundColor: b.vacancies.length === 0 ? '#cbd5e1' : REGION_COLORS[b.region].bg}}>전체 담기</button>
+            style={{backgroundColor: b.vacancies.length === 0 ? '#cbd5e1' : (allInCart ? '#64748b' : REGION_COLORS[b.region].bg)}}>{allInCart ? '전체 해제' : '전체 담기'}</button>
           <button className="px-2.5 py-1 text-[10px] font-bold bg-slate-800 text-white rounded hover:bg-slate-900">추가</button>
         </div>
       </div>
@@ -3640,14 +3735,14 @@ function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart
                     <td className="px-2 py-2 text-right">{cell(v.depositPerPy)}</td>
                     <td className="px-2 py-2 text-right">{cell(v.rentPerPy)}</td>
                     <td className="px-2 py-2 text-right">{cell(v.mgmtPerPy)}</td>
-                    <td className="px-2 py-2 text-right">{cell(v.noc)}</td>
+                    <td className="px-2 py-2 text-right">{cell(computeNoc(v))}</td>
                     <td className="px-2 py-2 text-right">{v.rf ?? ''}</td>
                     <td className="px-2 py-2 text-right">{v.fo ?? ''}</td>
                     <td className="px-2 py-2 text-right">{cell(v.ti)}</td>
                     <td className="px-2 py-2">
-                      <button onClick={() => onAddVacancy(b, v)} disabled={inCart}
-                        className={`text-[10px] font-bold whitespace-nowrap ${inCart ? 'text-slate-400' : 'text-indigo-600 hover:text-indigo-800'}`}>
-                        {inCart ? '담김' : '+ 담기'}
+                      <button onClick={() => onToggleVacancy(b, v)}
+                        className={`text-[10px] font-bold whitespace-nowrap ${inCart ? 'text-rose-500 hover:text-rose-700' : 'text-indigo-600 hover:text-indigo-800'}`}>
+                        {inCart ? '✓ 담김' : '+ 담기'}
                       </button>
                     </td>
                   </tr>
@@ -3664,7 +3759,7 @@ function VacancyDetailTable({ building: b, onAddVacancy, onAddAllVacancies, cart
 /* ============================================================
  * AllBuildingsPage - 전체 빌딩 리스트 페이지
  * ============================================================ */
-function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart }) {
+function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, onAddAllVacancies, cart }) {
   const [sort, setSort] = useState('area');
   const [starred, setStarred] = useState(new Set());
   const [page, setPage] = useState(1);
@@ -3767,14 +3862,14 @@ function AllBuildingsPage({ buildings, filters, onOpenDetail, onAddVacancy, cart
                     <td className="px-3 py-2 text-right text-slate-700">{b.baseLease ? b.baseLease + ' 평' : '-'}</td>
                     <td className="px-3 py-2 text-right text-slate-700">{b.noc ? b.noc.toLocaleString() + ' 원' : '-'}</td>
                     <td className="px-3 py-2 text-center">
-                      <button onClick={() => b.vacancies.forEach(v => onAddVacancy(b, v))}
+                      <button onClick={() => onAddAllVacancies(b)}
                         disabled={b.vacancies.length === 0}
                         className={`px-3 py-1 text-[10px] font-semibold border rounded ${
                           b.vacancies.length === 0 ? 'border-slate-100 text-slate-300 cursor-not-allowed' :
                           inCart ? 'border-indigo-200 text-indigo-600 bg-indigo-50' :
                           'border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                         }`}>
-                        {inCart ? '담김' : '담기'}
+                        {inCart ? '✓ 담김' : '담기'}
                       </button>
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -3856,7 +3951,7 @@ const GRADE_STYLES = {
 /* ============================================================
  * CompaniesPage - 거래처 리스트 페이지
  * ============================================================ */
-function CompaniesPage({ onlyMy, chatConds = [], onOpenDetail }) {
+function CompaniesPage({ onlyMy, onOpenDetail }) {
   const [sort, setSort] = useState('expiry');
   const [coldcallSet, setColdcallSet] = useState(new Set());
   const [starred, setStarred] = useState(new Set());
@@ -3925,15 +4020,16 @@ function CompaniesPage({ onlyMy, chatConds = [], onOpenDetail }) {
       if (filters.branch.length > 0 && !filters.branch.includes(c.지)) return false;
       // 당사 계약
       if (filters.contract.length > 0 && !filters.contract.includes(c.계)) return false;
-      // 만기일 구분 (체크박스 다중선택)
+      // 만기일 구분 (체크박스 다중선택, 상호배타 분류)
       if (filters.expiryType.length > 0) {
         const wantExp = filters.expiryType.includes('예상 만기일');
         const wantCf  = filters.expiryType.includes('확정 만기일');
         const wantUk  = filters.expiryType.includes('미확인');
-        const isExp = c.예유 === 'Y';
+        // 확정 만기일이 있으면 '확정', 없고 예상유무 Y면 '예상', 둘 다 없으면 '미확인' (한 가지로만 분류)
         const isCf  = c.확만 !== '-';
-        const isUk  = c.예유 !== 'Y' && c.확만 === '-';
-        const match = (wantExp && isExp) || (wantCf && isCf) || (wantUk && isUk);
+        const isExp = !isCf && c.예유 === 'Y';
+        const isUk  = !isCf && c.예유 !== 'Y';
+        const match = (wantCf && isCf) || (wantExp && isExp) || (wantUk && isUk);
         if (!match) return false;
       }
       // 예상 만기일 범위
@@ -3980,9 +4076,8 @@ function CompaniesPage({ onlyMy, chatConds = [], onOpenDetail }) {
           return av.localeCompare(bv);
       }
     });
-    arr = applyChatConds(arr, chatConds, 'companies');
     return arr;
-  }, [onlyMy, sort, filters, chatConds]);
+  }, [onlyMy, sort, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
@@ -5044,7 +5139,7 @@ const DEAL_MOVE_LIKELIHOOD = ['확정','상','중','하','미정'];
 const DEAL_PROGRESS_STAGES = ['제안서 발송','미팅 진행','투어 진행','LOI 제출','LOC 제출','계약서 검토 중','계약 진행','재계약','미계약'];
 const DEAL_SALES_OPTIONS = ['장한덕','송승원','박환웅','주정호','박인하','임정수','최필규','정혜정','김민희','구민모','박현철'];
 
-function DealsPage({ onlyMy, chatConds = [], onOpenDeal }) {
+function DealsPage({ onlyMy, onOpenDeal }) {
   const [sort, setSort] = useState('contractDate');
   const [perPage, setPerPage] = useState(15);
   const [page, setPage] = useState(1);
@@ -5111,8 +5206,8 @@ function DealsPage({ onlyMy, chatConds = [], onOpenDeal }) {
         default: return a.ec.localeCompare(b.ec);
       }
     });
-    return applyChatConds(arr, chatConds, 'deals');
-  }, [onlyMy, sort, filters, chatConds]);
+    return arr;
+  }, [onlyMy, sort, filters]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
   useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
@@ -5470,7 +5565,7 @@ function ContractTypePill({ type }) {
   return <span style={{display:'inline-block',padding:'2px 8px',borderRadius:4,fontSize:11,fontWeight:500,background:bg,color:c}}>{type}</span>;
 }
 
-function ContractsPage({ onlyMy, chatConds = [], onOpenContract }) {
+function ContractsPage({ onlyMy, onOpenContract }) {
   const [sort, setSort] = useState('endDate');
   const [perPage, setPerPage] = useState(15);
   const [page, setPage] = useState(1);
@@ -5533,8 +5628,8 @@ function ContractsPage({ onlyMy, chatConds = [], onOpenContract }) {
         default: return a.end.localeCompare(b.end);
       }
     });
-    return applyChatConds(arr, chatConds, 'contracts');
-  }, [onlyMy, sort, filters, chatConds]);
+    return arr;
+  }, [onlyMy, sort, filters]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const paged = filtered.slice((page-1)*perPage, page*perPage);
   useEffect(() => { if (page > totalPages) setPage(1); }, [totalPages, page]);
@@ -5558,9 +5653,6 @@ function ContractsPage({ onlyMy, chatConds = [], onOpenContract }) {
         <FilterBtn label="🔍 거래처명" k="ct-co" openF={openF} setOpenF={setOpenF} hasValue={hasV('company')}>
           <input type="text" value={filters.company} onChange={e => updateF('company', e.target.value)}
             placeholder="검색어 입력" className="w-full px-2 py-1 text-[12px] border border-slate-200 rounded outline-none focus:border-indigo-400"/>
-        </FilterBtn>
-        <FilterBtn label="계약 상태" k="ct-st" openF={openF} setOpenF={setOpenF} hasValue={hasV('status')}>
-          <MultiOpts opts={['계약 완료','입주 예정','입주 완료','계약 해지','갱신 협의']} selected={filters.status} onToggle={v => toggleArr('status', v)}/>
         </FilterBtn>
         {!onlyMy && <FilterBtn label="☆ 거래처 등급" k="ct-gr" openF={openF} setOpenF={setOpenF} hasValue={hasV('grade')}>
           <MultiOpts opts={['A','B','C','D','E','F']} selected={filters.grade} onToggle={v => toggleArr('grade', v)}/>
